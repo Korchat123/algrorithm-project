@@ -1,3 +1,13 @@
+BIG O notation is way to describ the worst case of give data when run code though time
+example
+    x=5+6 this is O(1) that mean use only 1 to compute
+    for(i=0;i<N;i++) this loop use N time to execute O(N)
+    for(i=0;i<N;i++)
+        for(j=0;j<N;j++) this loop over loop use N^2 time to run O(N^2)
+
+if O is more mean use more time when number of data is more
+
+
 binary search is a search that devide and compare is taget is more or less than that point go to medium again until found with this O(logN)
 examplle serch for h of array [a,b,c,d,e,f,g,h]
 while linear serch is check from a to h will use total 8 to find h
