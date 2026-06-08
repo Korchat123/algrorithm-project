@@ -28,6 +28,7 @@ export function Landing() {
         <InfoBlock title="Big O" value="Upper bound" text="The maximum growth rate you should plan for. It describes worst-case scaling." />
         <InfoBlock title="Big Omega" value="Lower bound" text="The best guaranteed growth rate. It shows how fast the work can be at minimum." />
         <InfoBlock title="Big Theta" value="Tight bound" text="The practical match when upper and lower growth describe the same behavior." />
+        <InfoBlock title="Space Complexity" value="Memory use" text="The extra memory an algorithm needs as input grows, such as arrays, stacks, queues, or recursion calls." />
       </section>
     </section>
   );

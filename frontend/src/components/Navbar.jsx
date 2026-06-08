@@ -1,5 +1,6 @@
-import { Brain, LogOut, User } from 'lucide-react';
+import { Brain, ChevronDown, LogOut, User } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
+import { algorithms } from '../assets/algorithms.js';
 import { useAuth } from '../contexts/useAuth.js';
 
 export function Navbar() {
@@ -13,7 +14,19 @@ export function Navbar() {
       </Link>
       <nav>
         <NavLink to="/">Home</NavLink>
-        <NavLink to="/algorithms">Algorithms</NavLink>
+        <NavLink to="/time-complexity">Time Complexity</NavLink>
+        <div className="nav-dropdown">
+          <NavLink to="/algorithms" className="nav-dropdown-trigger">
+            Algorithm <ChevronDown size={15} />
+          </NavLink>
+          <div className="nav-dropdown-menu">
+            {algorithms.map((algorithm) => (
+              <NavLink key={algorithm.slug} to={`/algorithms/${algorithm.slug}`}>
+                {algorithm.name}
+              </NavLink>
+            ))}
+          </div>
+        </div>
         <NavLink to="/games">Games</NavLink>
       </nav>
       <div className="auth-actions">

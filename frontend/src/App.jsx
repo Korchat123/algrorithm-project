@@ -5,6 +5,7 @@ import { AlgorithmPage } from './pages/AlgorithmPage.jsx';
 import { AuthPage } from './pages/AuthPage.jsx';
 import { Games } from './pages/Games.jsx';
 import { Landing } from './pages/Landing.jsx';
+import { TimeComplexity } from './pages/TimeComplexity.jsx';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/time-complexity" element={<TimeComplexity />} />
           <Route path="/algorithms" element={<AlgorithmIndex />} />
           <Route path="/algorithms/:slug" element={<AlgorithmPage />} />
           <Route path="/games" element={<Games />} />

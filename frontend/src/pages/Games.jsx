@@ -1,10 +1,21 @@
-import { ArrowDownUp, Check, CircleHelp, Play, RefreshCw, Target, Timer, Trophy } from 'lucide-react';
+import { ArrowDownUp, Check, CircleHelp, Play, RefreshCw, Search, Target, Timer, Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 const numberPool = [42, 7, 19, 3, 31, 12];
 const wordPool = ['mango', 'apple', 'grape', 'kiwi', 'banana', 'pear'];
 const quickSortPool = [29, 11, 45, 6, 18, 33, 24];
 const hanoiStart = [[4, 3, 2, 1], [], []];
+const hiddenBoxCount = 10;
+
+function createHiddenSearchRound() {
+  const values = Array.from({ length: hiddenBoxCount }, (_, index) => (index + 2) * 7);
+  const targetIndex = Math.floor(Math.random() * values.length);
+
+  return {
+    values,
+    target: values[targetIndex],
+  };
+}
 
 function formatTime(seconds) {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
@@ -34,19 +45,22 @@ function SortRace() {
   const [items, setItems] = useState(numberPool);
   const [selected, setSelected] = useState(null);
   const [moves, setMoves] = useState(0);
+  const [started, setStarted] = useState(false);
   const complete = isSorted(items, type);
-  const [seconds, setSeconds] = useTimer(!complete);
+  const [seconds, setSeconds] = useTimer(started && !complete);
 
   function reset(nextType = type) {
     setType(nextType);
     setItems(nextType === 'text' ? wordPool : numberPool);
     setSelected(null);
     setMoves(0);
+    setStarted(false);
     setSeconds(0);
   }
 
   function choose(index) {
     if (complete) return;
+    setStarted(true);
     if (selected === null) {
       setSelected(index);
       return;
@@ -104,7 +118,8 @@ function GuessGame() {
   const [hint, setHint] = useState('Ask with a number from 1 to 100.');
   const [steps, setSteps] = useState(0);
   const [done, setDone] = useState(false);
-  const [seconds, setSeconds] = useTimer(!done);
+  const [started, setStarted] = useState(false);
+  const [seconds, setSeconds] = useTimer(started && !done);
 
   function reset() {
     setTarget(Math.floor(Math.random() * 100) + 1);
@@ -112,6 +127,7 @@ function GuessGame() {
     setHint('Ask with a number from 1 to 100.');
     setSteps(0);
     setDone(false);
+    setStarted(false);
     setSeconds(0);
   }
 
@@ -119,6 +135,7 @@ function GuessGame() {
     event.preventDefault();
     const value = Number(guess);
     if (!Number.isInteger(value) || value < 1 || value > 100 || done) return;
+    setStarted(true);
     setSteps((count) => count + 1);
     if (value === target) {
       setHint(`Correct. The target was ${target}.`);
@@ -163,20 +180,25 @@ function HanoiGame() {
   const [towers, setTowers] = useState(hanoiStart);
   const [active, setActive] = useState(null);
   const [moves, setMoves] = useState(0);
+  const [started, setStarted] = useState(false);
   const complete = towers[2].length === 4;
-  const [seconds, setSeconds] = useTimer(!complete);
+  const [seconds, setSeconds] = useTimer(started && !complete);
 
   function reset() {
     setTowers(hanoiStart);
     setActive(null);
     setMoves(0);
+    setStarted(false);
     setSeconds(0);
   }
 
   function chooseTower(index) {
     if (complete) return;
     if (active === null) {
-      if (towers[index].length > 0) setActive(index);
+      if (towers[index].length > 0) {
+        setStarted(true);
+        setActive(index);
+      }
       return;
     }
     if (active === index) {
@@ -226,19 +248,22 @@ function BuildSortedGame() {
   const [source, setSource] = useState(quickSortPool);
   const [answer, setAnswer] = useState([]);
   const [mistakes, setMistakes] = useState(0);
+  const [started, setStarted] = useState(false);
   const complete = answer.length === quickSortPool.length && isSorted(answer);
   const next = useMemo(() => [...source].sort((a, b) => a - b)[0], [source]);
-  const [seconds, setSeconds] = useTimer(!complete);
+  const [seconds, setSeconds] = useTimer(started && !complete);
 
   function reset() {
     setSource(quickSortPool);
     setAnswer([]);
     setMistakes(0);
+    setStarted(false);
     setSeconds(0);
   }
 
   function pick(value) {
     if (complete) return;
+    setStarted(true);
     if (value !== next) {
       setMistakes((count) => count + 1);
       return;
@@ -272,6 +297,69 @@ function BuildSortedGame() {
   );
 }
 
+function HiddenIndexGame() {
+  const [round, setRound] = useState(() => createHiddenSearchRound());
+  const [revealed, setRevealed] = useState([]);
+  const [checks, setChecks] = useState(0);
+  const [started, setStarted] = useState(false);
+  const found = revealed.some((index) => round.values[index] === round.target);
+  const [seconds, setSeconds] = useTimer(started && !found);
+
+  function reset() {
+    setRound(createHiddenSearchRound());
+    setRevealed([]);
+    setChecks(0);
+    setStarted(false);
+    setSeconds(0);
+  }
+
+  function chooseBox(index) {
+    if (found || revealed.includes(index)) return;
+    setStarted(true);
+    setRevealed((current) => [...current, index]);
+    setChecks((count) => count + 1);
+  }
+
+  return (
+    <article className="play-panel">
+      <div className="game-header">
+        <div>
+          <p className="eyebrow">Game 5</p>
+          <h2>Find hidden number</h2>
+        </div>
+        <Search />
+      </div>
+      <div className="metric-row">
+        <span><Timer size={16} />{formatTime(seconds)}</span>
+        <span><Target size={16} />{checks} checks</span>
+      </div>
+      <div className="target-chip">
+        <span>Target</span>
+        <strong>{round.target}</strong>
+      </div>
+      <div className="hidden-search-board">
+        {round.values.map((value, index) => {
+          const isRevealed = revealed.includes(index);
+          const isFound = isRevealed && value === round.target;
+
+          return (
+            <button
+              className={`hidden-box ${isRevealed ? 'revealed' : ''} ${isFound ? 'found' : ''}`}
+              key={`${value}-${index}`}
+              onClick={() => chooseBox(index)}
+            >
+              <span>Index {index}</span>
+              <strong>{isRevealed ? value : '?'}</strong>
+            </button>
+          );
+        })}
+      </div>
+      <p className="game-status">{found ? `Found ${round.target} in ${checks} checks and ${formatTime(seconds)}.` : 'Choose an index to reveal its hidden number.'}</p>
+      <button className="wide-button" onClick={reset}><RefreshCw size={16} />New boxes</button>
+    </article>
+  );
+}
+
 export function Games() {
   return (
     <section className="page games-page">
@@ -285,6 +373,7 @@ export function Games() {
         <GuessGame />
         <HanoiGame />
         <BuildSortedGame />
+        <HiddenIndexGame />
       </div>
     </section>
   );

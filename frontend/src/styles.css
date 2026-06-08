@@ -93,6 +93,43 @@ button {
   color: #173f34;
 }
 
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown-trigger {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.nav-dropdown-menu {
+  background: #ffffff;
+  border: 1px solid #d8ded2;
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(23, 32, 38, 0.12);
+  display: none;
+  left: 0;
+  min-width: 230px;
+  padding: 8px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+}
+
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-dropdown-menu a {
+  border-radius: 6px;
+  min-height: 36px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
 .auth-actions {
   gap: 8px;
   justify-content: flex-end;
@@ -233,7 +270,7 @@ button {
 .complexity-band {
   display: grid;
   gap: 1px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   margin-top: 24px;
 }
 
@@ -1058,7 +1095,8 @@ pre {
 
 .sort-board,
 .source-row,
-.answer-row {
+.answer-row,
+.hidden-search-board {
   background: #eef3ed;
   border: 1px solid #d8ded2;
   border-radius: 8px;
@@ -1069,6 +1107,74 @@ pre {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+}
+
+.hidden-search-board {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.target-chip {
+  align-items: center;
+  background: #fff4ed;
+  border: 1px solid #e3b19f;
+  border-radius: 8px;
+  color: #9e3f27;
+  display: inline-flex;
+  gap: 10px;
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+
+.target-chip span {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.target-chip strong {
+  color: #14231f;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.hidden-box {
+  background: #ffffff;
+  border: 2px solid #cbd6cd;
+  border-radius: 8px;
+  color: #173f34;
+  display: grid;
+  gap: 6px;
+  min-height: 78px;
+  padding: 10px;
+}
+
+.hidden-box span {
+  color: #66746d;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hidden-box strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.hidden-box.revealed {
+  border-color: #d95d39;
+}
+
+.hidden-box.found {
+  background: #1c9c75;
+  border-color: #1c9c75;
+  color: #ffffff;
+}
+
+.hidden-box.found span {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .sort-token {
@@ -1227,6 +1333,83 @@ pre {
   margin-top: 18px;
 }
 
+.complexity-page {
+  display: grid;
+  gap: 18px;
+}
+
+.complexity-overview,
+.complexity-split {
+  display: grid;
+  gap: 16px;
+}
+
+.complexity-overview {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.complexity-split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.complexity-card {
+  background: #ffffff;
+  border: 1px solid #d8ded2;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.complexity-card span {
+  color: #b24b34;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.complexity-card h2,
+.growth-panel h2,
+.complexity-split h2 {
+  margin: 8px 0;
+}
+
+.complexity-card strong {
+  color: #173f34;
+}
+
+.complexity-card p,
+.complexity-split p,
+.growth-row p {
+  color: #52615b;
+  line-height: 1.55;
+}
+
+.growth-table {
+  display: grid;
+  gap: 1px;
+}
+
+.growth-row {
+  align-items: center;
+  background: #f5f7f2;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 110px 150px minmax(0, 1fr);
+  padding: 12px;
+}
+
+.growth-row strong {
+  color: #173f34;
+}
+
+.growth-row span {
+  color: #b24b34;
+  font-weight: 800;
+}
+
+.growth-row p {
+  margin: 0;
+}
+
 .auth-page {
   display: grid;
   min-height: calc(100vh - 72px);
@@ -1258,6 +1441,17 @@ pre {
   .topbar nav {
     justify-content: flex-start;
     overflow-x: auto;
+  }
+
+  .nav-dropdown {
+    position: static;
+  }
+
+  .nav-dropdown-menu {
+    max-height: 280px;
+    overflow-y: auto;
+    position: absolute;
+    top: 62px;
   }
 
   .auth-actions {
@@ -1293,6 +1487,16 @@ pre {
 
   .search-scroll {
     grid-template-rows: 158px 50px 84px;
+  }
+
+  .complexity-overview,
+  .complexity-split {
+    grid-template-columns: 1fr;
+  }
+
+  .growth-row {
+    align-items: start;
+    grid-template-columns: 1fr;
   }
 }
 
