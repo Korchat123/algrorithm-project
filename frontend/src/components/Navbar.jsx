@@ -37,12 +37,7 @@ export function Navbar() {
               <LogOut size={18} />
             </button>
           </>
-        ) : (
-          <>
-            <Link className="ghost-button" to="/login">Log in</Link>
-            <Link className="primary-button" to="/register">Register</Link>
-          </>
-        )}
+        ) : null}
       </div>
     </header>
   );
