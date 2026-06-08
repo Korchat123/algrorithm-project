@@ -8,6 +8,7 @@ import { buildSteps, initialValues, parseValues, shuffle } from '../utils/algori
 export function AlgorithmPage() {
   const { slug } = useParams();
   const algorithm = algorithms.find((item) => item.slug === slug) || algorithms[0];
+  const isKnn = algorithm.slug === 'knn';
   const samples = useMemo(() => codeSamples[algorithm.slug] || {}, [algorithm.slug]);
   const languageOptions = useMemo(() => Object.keys(samples), [samples]);
   const [values, setValues] = useState(initialValues);
@@ -54,7 +55,7 @@ export function AlgorithmPage() {
       setIsPlaying(false);
       return;
     }
-    const nextSteps = buildSteps(algorithm, values, Number(target));
+    const nextSteps = buildSteps(algorithm, isKnn ? input : values, isKnn ? target : Number(target));
     setSteps(nextSteps);
     setStepIndex(0);
     setIsPlaying(nextSteps.length > 1);
@@ -86,6 +87,17 @@ export function AlgorithmPage() {
   };
 
   const shuffleData = () => {
+    if (isKnn) {
+      const items = input.split(',').map((item) => item.trim()).filter(Boolean);
+      const shuffledItems = shuffle(items);
+      setIsPlaying(false);
+      setSteps([]);
+      setStepIndex(0);
+      setInput(shuffledItems.join(', '));
+      setTarget(shuffledItems[Math.floor(Math.random() * shuffledItems.length)] || '');
+      return;
+    }
+
     const shuffled = shuffle(values);
     setIsPlaying(false);
     setSteps([]);
@@ -108,16 +120,16 @@ export function AlgorithmPage() {
           </div>
           <div className="controls">
             <label>
-              Mock data
+              {isKnn ? 'Training data' : 'Mock data'}
               <input value={input} onChange={(event) => setInput(event.target.value)} />
             </label>
             <label>
               Target
-              <input type="number" value={target} onChange={(event) => setTarget(event.target.value)} />
+              <input type={isKnn ? 'text' : 'number'} value={target} onChange={(event) => setTarget(event.target.value)} />
             </label>
             <button onClick={shuffleData}><Shuffle size={16} />Shuffle</button>
           </div>
-          <Visualizer algorithm={algorithm} values={values} step={currentStep} target={target} />
+          <Visualizer algorithm={algorithm} values={isKnn ? input : values} step={currentStep} target={target} />
           <div className="step-row">
             <div className="step-actions">
               <button onClick={back} disabled={!steps.length || stepIndex === 0}><ChevronLeft size={16} />Prev</button>

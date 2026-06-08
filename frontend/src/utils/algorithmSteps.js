@@ -36,6 +36,8 @@ export function buildSteps(algorithm, values, target) {
   }
 
   if (algorithm.category === 'machine-learning') {
+    if (algorithm.slug === 'knn') return withRoundCounts(knnSteps(values, target));
+
     return withRoundCounts([
       { message: 'Convert every item into a vector.' },
       { message: 'Measure distance or similarity to the query.' },
@@ -313,6 +315,121 @@ function interpolationSearchSteps(values, target) {
 
 function range(start, end) {
   return Array.from({ length: Math.max(0, end - start) }, (_, offset) => start + offset);
+}
+
+function knnSteps(input, target) {
+  const items = parseKnnItems(input);
+  const rawItems = items.map((item) => item.raw);
+  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'Target', rawItems, true);
+  const distances = items
+    .map((item) => ({
+      ...item,
+      distance: Math.hypot(item.x - query.x, item.y - query.y)
+    }))
+    .sort((a, b) => a.distance - b.distance);
+  const nearest = distances.slice(0, Math.min(3, distances.length));
+  const prediction = chooseKnnLabel(nearest);
+  const base = { points: items, query, nearest: [] };
+
+  if (!items.length) {
+    return [{ message: 'Add numbers or words first so KNN can map them.' }];
+  }
+
+  return [
+    {
+      ...base,
+      phase: 'Map data',
+      codeLines: [2, 3],
+      message: 'Map each number or word into a point.',
+      detail: 'KNN first turns each input into features. Numbers use their value. Words use length and first letter so they can be placed on the map.'
+    },
+    ...distances.map((item, index) => ({
+      ...base,
+      activePoint: item.id,
+      measured: distances.slice(0, index + 1).map((entry) => entry.id),
+      phase: `Distance ${index + 1}`,
+      codeLines: [5, 6],
+      message: `Measure distance from target to ${item.raw}.`,
+      detail: `${item.raw} is ${item.distance.toFixed(1)} map units from the target. Smaller distance means more similar.`
+    })),
+    {
+      ...base,
+      measured: distances.map((item) => item.id),
+      nearest: nearest.map((item) => item.id),
+      phase: 'Pick nearest',
+      codeLines: [8],
+      message: 'Choose the 3 closest points.',
+      detail: `The nearest neighbors are ${nearest.map((item) => item.raw).join(', ')}. KNN only votes with these closest examples.`
+    },
+    {
+      ...base,
+      measured: distances.map((item) => item.id),
+      nearest: nearest.map((item) => item.id),
+      prediction,
+      phase: 'Vote',
+      codeLines: [9, 10],
+      message: `Predicted class: ${prediction}.`,
+      detail: `The closest examples vote by label, so the target is predicted as "${prediction}".`
+    }
+  ];
+}
+
+function parseKnnItems(input) {
+  const rawItems = Array.isArray(input)
+    ? input.map((item) => String(item))
+    : String(input || '').split(',').map((item) => item.trim()).filter(Boolean);
+  const numericValues = rawItems.map(Number).filter((value) => Number.isFinite(value));
+  const numericMedian = numericValues.length
+    ? [...numericValues].sort((a, b) => a - b)[Math.floor(numericValues.length / 2)]
+    : 0;
+
+  return rawItems.map((raw, index, all) => buildKnnPoint(raw, getKnnLabel(raw, numericMedian), all, false, index));
+}
+
+function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0) {
+  const number = Number(raw);
+  const allNumbers = allItems.map(Number).filter((value) => Number.isFinite(value));
+
+  if (Number.isFinite(number) && allNumbers.length) {
+    const min = Math.min(...allNumbers, number);
+    const max = Math.max(...allNumbers, number);
+    const spread = max - min || 1;
+    const normalized = (number - min) / spread;
+    return {
+      id: isQuery ? 'target' : `p-${index}`,
+      raw,
+      label,
+      x: 12 + normalized * 76,
+      y: 78 - normalized * 52 + (isQuery ? 0 : (index % 3) * 8),
+      feature: `value ${number}`
+    };
+  }
+
+  const word = raw.toLowerCase();
+  const maxLength = Math.max(...allItems.map((item) => String(item).length), raw.length, 1);
+  const firstCode = word.charCodeAt(0) || 97;
+  return {
+    id: isQuery ? 'target' : `p-${index}`,
+    raw,
+    label,
+    x: 12 + (raw.length / maxLength) * 76,
+    y: 82 - ((firstCode - 97) / 25) * 58,
+    feature: `length ${raw.length}`
+  };
+}
+
+function getKnnLabel(raw, numericMedian) {
+  const number = Number(raw);
+  if (Number.isFinite(number)) return number >= numericMedian ? 'high' : 'low';
+  return raw.length >= 6 ? 'long text' : 'short text';
+}
+
+function chooseKnnLabel(nearest) {
+  const counts = nearest.reduce((acc, item) => {
+    acc[item.label] = (acc[item.label] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
 }
 
 function bfsOrder() {

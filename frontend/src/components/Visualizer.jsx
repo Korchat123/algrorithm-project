@@ -5,6 +5,9 @@ export function Visualizer({ algorithm, values, step, target }) {
     return <GraphVisualizer algorithm={algorithm} step={step} />;
   }
   if (algorithm.category === 'machine-learning') {
+    if (algorithm.slug === 'knn') {
+      return <KnnVisualizer step={step} />;
+    }
     return <VectorVisualizer />;
   }
 
@@ -129,6 +132,61 @@ function VectorVisualizer() {
       ].map(([label, left, top]) => (
         <span key={label} className={label === 'Q' ? 'query-point' : 'point'} style={{ left: `${left}%`, top: `${top}%` }}>{label}</span>
       ))}
+    </div>
+  );
+}
+
+function KnnVisualizer({ step }) {
+  const points = step?.points || [];
+  const query = step?.query;
+  const measured = new Set(step?.measured || []);
+  const nearest = new Set(step?.nearest || []);
+
+  return (
+    <div className="knn-stage">
+      <div className="knn-map">
+        <span className="axis-label x-axis">feature 1</span>
+        <span className="axis-label y-axis">feature 2</span>
+        <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          {query && points.map((point) => {
+            const isMeasured = measured.has(point.id);
+            const isNearest = nearest.has(point.id);
+            const isActive = step?.activePoint === point.id;
+            if (!isMeasured && !isNearest && !isActive) return null;
+            return (
+              <line
+                className={`knn-line ${isNearest ? 'nearest' : ''} ${isActive ? 'active' : ''}`}
+                key={point.id}
+                x1={query.x}
+                x2={point.x}
+                y1={query.y}
+                y2={point.y}
+              />
+            );
+          })}
+        </svg>
+        {points.map((point) => (
+          <span
+            className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
+            key={point.id}
+            style={{ left: `${point.x}%`, top: `${point.y}%` }}
+          >
+            <strong>{point.raw}</strong>
+            <small>{point.label}</small>
+          </span>
+        ))}
+        {query && (
+          <span className="knn-point query" style={{ left: `${query.x}%`, top: `${query.y}%` }}>
+            <strong>{query.raw}</strong>
+            <small>target</small>
+          </span>
+        )}
+      </div>
+      <div className="knn-explanation">
+        <strong>{step?.phase || 'KNN map'}</strong>
+        <p>{step?.detail || 'Press Play to map your data and compare each point to the target.'}</p>
+        {step?.prediction && <span>Result: {step.prediction}</span>}
+      </div>
     </div>
   );
 }
