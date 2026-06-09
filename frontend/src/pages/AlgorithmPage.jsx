@@ -3,12 +3,38 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Code2, Pause, Play, Shuffle, 
 import { useParams } from 'react-router-dom';
 import { algorithms, codeSamples } from '../assets/algorithms.js';
 import { Visualizer } from '../components/Visualizer.jsx';
-import { buildSteps, initialValues, parseValues, shuffle } from '../utils/algorithmSteps.js';
+import { buildKnnPreview, buildSteps, buildVectorPreview, initialValues, parseValues, shuffle } from '../utils/algorithmSteps.js';
+
+const defaultKnnInput = 'apple, banana, tiger, dolphin, bicycle, airplane, school, museum';
+const defaultKnnTarget = 'zoo';
+const defaultVectorInput = 'i, you, love, hate, like, dog, cat, apple, banana, school, museum, airplane, car, home, park, teacher, student';
+const defaultVectorTarget = 'i love dog';
+const realVectorSearchCode = `async function buildVectorIndex(documents, embeddingModel, vectorIndex) {
+  for (const document of documents) {
+    const vector = await embeddingModel.embed(document.text);
+    await vectorIndex.upsert({
+      id: document.id,
+      vector,
+      metadata: { text: document.text }
+    });
+  }
+}
+
+async function vectorSearch(queryText, embeddingModel, vectorIndex) {
+  const queryVector = await embeddingModel.embed(queryText);
+  return vectorIndex.search({
+    vector: queryVector,
+    topK: 3,
+    metric: 'cosine'
+  });
+}`;
 
 export function AlgorithmPage() {
   const { slug } = useParams();
   const algorithm = algorithms.find((item) => item.slug === slug) || algorithms[0];
   const isKnn = algorithm.slug === 'knn';
+  const isVectorSearch = algorithm.slug === 'vector-search';
+  const isTextMachineLearning = isKnn || isVectorSearch;
   const samples = useMemo(() => codeSamples[algorithm.slug] || {}, [algorithm.slug]);
   const languageOptions = useMemo(() => Object.keys(samples), [samples]);
   const [values, setValues] = useState(initialValues);
@@ -18,6 +44,7 @@ export function AlgorithmPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [language, setLanguage] = useState('js');
+  const [vectorCodeMode, setVectorCodeMode] = useState('demo');
 
   useEffect(() => {
     const parsed = parseValues(input);
@@ -31,7 +58,17 @@ export function AlgorithmPage() {
   }, [algorithm.slug, language, languageOptions, samples]);
 
   const currentStep = steps[stepIndex];
+  const knnPreviewStep = useMemo(() => (
+    isKnn ? buildKnnPreview(input, target) : null
+  ), [input, isKnn, target]);
+  const vectorPreviewStep = useMemo(() => (
+    isVectorSearch ? buildVectorPreview(input, target) : null
+  ), [input, isVectorSearch, target]);
+  const visualStep = isTextMachineLearning ? currentStep || knnPreviewStep || vectorPreviewStep : currentStep;
   const liveCode = samples.js || samples[languageOptions[0]] || 'No code example available.';
+  const implementationCode = isVectorSearch && vectorCodeMode === 'real'
+    ? realVectorSearchCode
+    : samples[language] || samples[languageOptions[0]] || 'No code example available.';
   const activeCodeLines = currentStep?.codeLines || [];
   const activeCodeTone = Number.isInteger(currentStep?.found) ? 'found' : 'active';
   const roundLabel = currentStep ? `${currentStep.round} / ${currentStep.totalRounds}` : `0 / ${steps.length}`;
@@ -50,12 +87,21 @@ export function AlgorithmPage() {
     return () => window.clearTimeout(timer);
   }, [isPlaying, stepIndex, steps.length]);
 
+  useEffect(() => {
+    if (!isTextMachineLearning) return;
+    setInput(isKnn ? defaultKnnInput : defaultVectorInput);
+    setTarget(isKnn ? defaultKnnTarget : defaultVectorTarget);
+    setSteps([]);
+    setStepIndex(0);
+    setIsPlaying(false);
+  }, [isKnn, isTextMachineLearning]);
+
   const run = () => {
     if (isPlaying) {
       setIsPlaying(false);
       return;
     }
-    const nextSteps = buildSteps(algorithm, isKnn ? input : values, isKnn ? target : Number(target));
+    const nextSteps = buildSteps(algorithm, isTextMachineLearning ? input : values, isTextMachineLearning ? target : Number(target));
     setSteps(nextSteps);
     setStepIndex(0);
     setIsPlaying(nextSteps.length > 1);
@@ -87,7 +133,7 @@ export function AlgorithmPage() {
   };
 
   const shuffleData = () => {
-    if (isKnn) {
+    if (isTextMachineLearning) {
       const items = input.split(',').map((item) => item.trim()).filter(Boolean);
       const shuffledItems = shuffle(items);
       setIsPlaying(false);
@@ -111,6 +157,7 @@ export function AlgorithmPage() {
       <div className="page-heading compact">
         <p className="eyebrow">{algorithm.category}</p>
         <h1>{algorithm.name}</h1>
+        <p className="algorithm-detail">{algorithm.detail}</p>
         <p>{algorithm.summary}</p>
       </div>
       <div className="workbench">
@@ -119,17 +166,24 @@ export function AlgorithmPage() {
             <h2>Animation</h2>
           </div>
           <div className="controls">
-            <label>
-              {isKnn ? 'Training data' : 'Mock data'}
-              <input value={input} onChange={(event) => setInput(event.target.value)} />
-            </label>
+            {!isTextMachineLearning && (
+              <label>
+                Mock data
+                <input value={input} onChange={(event) => setInput(event.target.value)} />
+              </label>
+            )}
             <label>
               Target
-              <input type={isKnn ? 'text' : 'number'} value={target} onChange={(event) => setTarget(event.target.value)} />
+              <input
+                placeholder={isTextMachineLearning ? 'Type a word, for example airport' : undefined}
+                type={isTextMachineLearning ? 'text' : 'number'}
+                value={target}
+                onChange={(event) => setTarget(event.target.value)}
+              />
             </label>
-            <button onClick={shuffleData}><Shuffle size={16} />Shuffle</button>
+            {!isTextMachineLearning && <button onClick={shuffleData}><Shuffle size={16} />Shuffle</button>}
           </div>
-          <Visualizer algorithm={algorithm} values={isKnn ? input : values} step={currentStep} target={target} />
+          <Visualizer algorithm={algorithm} values={isTextMachineLearning ? input : values} step={visualStep} target={target} />
           <div className="step-row">
             <div className="step-actions">
               <button onClick={back} disabled={!steps.length || stepIndex === 0}><ChevronLeft size={16} />Prev</button>
@@ -155,7 +209,7 @@ export function AlgorithmPage() {
             <h2>Complexity</h2>
             <div className="complexity-table">
               <span>Best</span><strong>{formatRuntimeComplexity('best', algorithm.bigO.best)}</strong>
-              <span>Average</span><strong>{formatRuntimeComplexity('average', algorithm.bigO.average)}</strong>
+              <span>Average</span><strong>{formatAverageComplexity(algorithm.bigO.average)}</strong>
               <span>Worst</span><strong>{algorithm.bigO.worst}</strong>
               <span>Space</span><strong>{algorithm.bigO.space}</strong>
             </div>
@@ -169,15 +223,39 @@ export function AlgorithmPage() {
       <section className="panel code-panel">
         <div className="panel-title">
           <h2><Code2 size={20} />Implementation examples</h2>
-          <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-            {languageOptions.map((option) => (
-              <option key={option} value={option}>{languageLabels[option] || option}</option>
-            ))}
-          </select>
+          {isVectorSearch ? (
+            <div className="code-mode-toggle" aria-label="Vector search code mode">
+              <button className={vectorCodeMode === 'demo' ? 'selected' : ''} onClick={() => setVectorCodeMode('demo')}>Demo</button>
+              <button className={vectorCodeMode === 'real' ? 'selected' : ''} onClick={() => setVectorCodeMode('real')}>Real NN</button>
+            </div>
+          ) : (
+            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              {languageOptions.map((option) => (
+                <option key={option} value={option}>{languageLabels[option] || option}</option>
+              ))}
+            </select>
+          )}
         </div>
-        <CodeBlock code={samples[language] || samples[languageOptions[0]] || 'No code example available.'}/>
+        {isVectorSearch && <VectorSearchDifference mode={vectorCodeMode} />}
+        <CodeBlock code={implementationCode}/>
       </section>
     </section>
+  );
+}
+
+function VectorSearchDifference({ mode }) {
+  if (mode === 'real') {
+    return (
+      <div className="vector-note">
+        Real vector search uses an embedding model, often a neural network, to create high-dimensional vectors. A nearest-neighbor index then finds the closest stored vectors without manually written keyword groups.
+      </div>
+    );
+  }
+
+  return (
+    <div className="vector-note">
+      This demo uses a small signed 8D keyword vector and cosine similarity so the animation is readable. Real vector search replaces those rules with learned embeddings and nearest-neighbor search over many dimensions.
+    </div>
   );
 }
 
@@ -251,4 +329,8 @@ function getWorstCaseScenario(algorithm, values) {
 function formatRuntimeComplexity(type, value) {
   const notation = type === 'best' ? '\u03A9' : '\u0398';
   return value.replace(/^O/, notation);
+}
+
+function formatAverageComplexity(value) {
+  return value.replace(/^O/, '\u0398');
 }

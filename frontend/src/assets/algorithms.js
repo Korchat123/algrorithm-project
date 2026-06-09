@@ -1,18 +1,18 @@
 export const algorithms = [
-  { slug: 'linear-search', name: 'Linear Search', category: 'search', summary: 'Checks values from left to right until a target appears.', bigO: { best: 'O(1)', average: 'O(n)', worst: 'O(n)', space: 'O(1)' } },
-  { slug: 'binary-search', name: 'Binary Search', category: 'search', summary: 'Cuts a sorted list in half after each comparison.', bigO: { best: 'O(1)', average: 'O(log n)', worst: 'O(log n)', space: 'O(1)' } },
-  { slug: 'jump-search', name: 'Jump Search', category: 'search', summary: 'Jumps by blocks, then scans the likely block.', bigO: { best: 'O(1)', average: 'O(sqrt n)', worst: 'O(sqrt n)', space: 'O(1)' } },
-  { slug: 'interpolation-search', name: 'Interpolation Search', category: 'search', summary: 'Estimates where the target should be in evenly spaced sorted data.', bigO: { best: 'O(1)', average: 'O(log log n)', worst: 'O(n)', space: 'O(1)' } },
-  { slug: 'bubble-sort', name: 'Bubble Sort', category: 'sort', summary: 'Swaps adjacent values until larger values bubble to the end.', bigO: { best: 'O(n)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' } },
-  { slug: 'selection-sort', name: 'Selection Sort', category: 'sort', summary: 'Places the smallest remaining value into the next sorted slot.', bigO: { best: 'O(n^2)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' } },
-  { slug: 'merge-sort', name: 'Merge Sort', category: 'sort', summary: 'Divides data, sorts pieces, and merges them in order.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' } },
-  { slug: 'quick-sort', name: 'Quicksort', category: 'sort', summary: 'Uses a pivot to partition smaller and larger values.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n^2)', space: 'O(log n)' } },
-  { slug: 'bucket-sort', name: 'Bucket Sort', category: 'sort', summary: 'Groups values into buckets before sorting and joining them.', bigO: { best: 'O(n + k)', average: 'O(n + k)', worst: 'O(n^2)', space: 'O(n + k)' } },
-  { slug: 'heap-sort', name: 'Heapsort', category: 'sort', summary: 'Builds a heap, then repeatedly moves the max value into place.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(1)' } },
-  { slug: 'bfs', name: 'Breadth-First Search', category: 'graph', summary: 'Explores graph nodes by distance from the start node.', bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' } },
-  { slug: 'dfs', name: 'Depth-First Search', category: 'graph', summary: 'Explores one branch deeply before backtracking.', bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' } },
-  { slug: 'knn', name: 'K-Nearest Neighbors', category: 'machine-learning', summary: 'Predicts from the nearest labeled examples.', bigO: { best: 'O(n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' } },
-  { slug: 'vector-search', name: 'Vector Search', category: 'machine-learning', summary: 'Ranks items by similarity between numeric vectors.', bigO: { best: 'O(d)', average: 'O(n*d)', worst: 'O(n*d)', space: 'O(n*d)' } }
+  { slug: 'linear-search', name: 'Linear Search', category: 'search', detail: 'Linear search is the simplest way to find a value. It checks the first item, then the next item, and continues until it finds the target or reaches the end.', summary: 'Checks values from left to right until a target appears.', bigO: { best: 'O(1)', average: 'O(n)', worst: 'O(n)', space: 'O(1)' } },
+  { slug: 'binary-search', name: 'Binary Search', category: 'search', detail: 'Binary search works only on sorted data. It checks the middle value, removes the half that cannot contain the target, and repeats on the remaining half.', summary: 'Cuts a sorted list in half after each comparison.', bigO: { best: 'O(1)', average: 'O(log n)', worst: 'O(log n)', space: 'O(1)' } },
+  { slug: 'jump-search', name: 'Jump Search', category: 'search', detail: 'Jump search works on sorted data by moving forward in fixed-size blocks. After it passes the target range, it scans inside that smaller block.', summary: 'Jumps by blocks, then scans the likely block.', bigO: { best: 'O(1)', average: 'O(sqrt n)', worst: 'O(sqrt n)', space: 'O(1)' } },
+  { slug: 'interpolation-search', name: 'Interpolation Search', category: 'search', detail: 'Interpolation search guesses where the target should be based on the target value. It is strongest when sorted numbers are spread evenly.', summary: 'Estimates where the target should be in evenly spaced sorted data.', bigO: { best: 'O(1)', average: 'O(log log n)', worst: 'O(n)', space: 'O(1)' } },
+  { slug: 'bubble-sort', name: 'Bubble Sort', category: 'sort', detail: 'Bubble sort repeatedly compares neighboring items and swaps them when they are out of order. Large values slowly move toward the end after each pass.', summary: 'Swaps adjacent values until larger values bubble to the end.', bigO: { best: 'O(n)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' } },
+  { slug: 'selection-sort', name: 'Selection Sort', category: 'sort', detail: 'Selection sort finds the smallest remaining item and places it into the next sorted position. It makes few swaps but still scans a lot.', summary: 'Places the smallest remaining value into the next sorted slot.', bigO: { best: 'O(n^2)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' } },
+  { slug: 'merge-sort', name: 'Merge Sort', category: 'sort', detail: 'Merge sort splits the list into smaller lists, sorts each piece, then merges the pieces back together in order. It is reliable for large data.', summary: 'Divides data, sorts pieces, and merges them in order.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' } },
+  { slug: 'quick-sort', name: 'Quicksort', category: 'sort', detail: 'Quicksort chooses a pivot, moves smaller values to one side and larger values to the other, then sorts each side. Good pivots make it very fast.', summary: 'Uses a pivot to partition smaller and larger values.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n^2)', space: 'O(log n)' } },
+  { slug: 'bucket-sort', name: 'Bucket Sort', category: 'sort', detail: 'Bucket sort places values into groups called buckets, sorts each bucket, then joins the buckets together. It works best when data is evenly distributed.', summary: 'Groups values into buckets before sorting and joining them.', bigO: { best: 'O(n + k)', average: 'O(n + k)', worst: 'O(n^2)', space: 'O(n + k)' } },
+  { slug: 'heap-sort', name: 'Heapsort', category: 'sort', detail: 'Heapsort turns the data into a heap structure so the largest value can be removed efficiently. It repeats this until everything is sorted.', summary: 'Builds a heap, then repeatedly moves the max value into place.', bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(1)' } },
+  { slug: 'bfs', name: 'Breadth-First Search', category: 'graph', detail: 'Breadth-first search explores a graph level by level. It visits all nearby nodes first before moving farther away from the start.', summary: 'Explores graph nodes by distance from the start node.', bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' } },
+  { slug: 'dfs', name: 'Depth-First Search', category: 'graph', detail: 'Depth-first search follows one path as deep as possible before backtracking. It is useful for exploring branches, paths, and connected areas.', summary: 'Explores one branch deeply before backtracking.', bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' } },
+  { slug: 'knn', name: 'K-Nearest Neighbors', category: 'machine-learning', detail: 'KNN stores known examples, maps a new target into the same feature space, then lets the closest examples vote for the target class.', summary: 'Predicts from the nearest labeled examples.', bigO: { best: 'O(n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' } },
+  { slug: 'vector-search', name: 'Vector Search', category: 'machine-learning', detail: 'Vector search converts items into numeric vectors and compares them by distance or similarity. It is commonly used for semantic search and recommendations.', summary: 'Ranks items by similarity between numeric vectors.', bigO: { best: 'O(d)', average: 'O(n*d)', worst: 'O(n*d)', space: 'O(n*d)' } }
 ];
 
 export const codeSamples = {
@@ -188,14 +188,27 @@ def jump_search(arr, target):
 }`
   },
   'quick-sort': {
-    js: `function quickSort(arr) {
-  if (arr.length <= 1) return arr;
-  const [pivot, ...rest] = arr;
-  return [
-    ...quickSort(rest.filter((value) => value < pivot)),
-    pivot,
-    ...quickSort(rest.filter((value) => value >= pivot))
-  ];
+    js: `function quickSort(arr, low = 0, high = arr.length - 1) {
+  if (low >= high) return arr;
+  const pivot = arr[high];
+  let left = low;
+
+  for (let i = low; i < high; i++) {
+    if (arr[i] < pivot) {
+      const temp = arr[left];
+      arr[left] = arr[i];
+      arr[i] = temp;
+      left++;
+    }
+  }
+
+  const temp = arr[left];
+  arr[left] = arr[high];
+  arr[high] = temp;
+
+  quickSort(arr, low, left - 1);
+  quickSort(arr, left + 1, high);
+  return arr;
 }`
   },
   'bucket-sort': {
@@ -267,22 +280,78 @@ def jump_search(arr, target):
 }`
   },
   knn: {
-    js: `function knn(points, target, k) {
-  return points
-    .map((point) => ({
-      ...point,
-      distance: Math.hypot(point.x - target.x, point.y - target.y)
-    }))
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, k);
+    js: `function knn(items, target, k = 3) {
+  const points = items.map(toPoint);
+  const query = toPoint(target, 'target');
+
+  const ranked = points.map((point) => ({
+    ...point,
+    distance: Math.hypot(point.x - query.x, point.y - query.y)
+  })).sort((a, b) => a.distance - b.distance);
+
+  const nearest = ranked.slice(0, k);
+  return vote(nearest);
+}
+
+function toPoint(raw, id = raw) {
+  const category = getCategory(raw);
+  const anchors = {
+    fruit: [20, 24],
+    animal: [78, 24],
+    vehicle: [22, 76],
+    place: [78, 76],
+    text: [50, 50]
+  };
+  const [x, y] = anchors[category] || anchors.text;
+  return { id, raw, label: category, x, y };
+}
+
+function vote(nearest) {
+  const counts = {};
+  for (const point of nearest) counts[point.label] = (counts[point.label] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }`
   },
   'vector-search': {
-    js: `function cosineSimilarity(a, b) {
+    js: `function vectorSearch(items, queryText, limit = 3) {
+  const vectors = items.map(toVector);
+  const query = toVector(queryText);
+
+  const ranked = vectors.map((item) => ({
+    ...item,
+    similarity: cosineSimilarity(item.vector, query.vector)
+  })).sort((a, b) => b.similarity - a.similarity);
+
+  return ranked.filter((item) => item.similarity > 0).slice(0, limit);
+}
+
+function toVector(text) {
+  const words = tokenize(text);
+  const concepts = {
+    self: { pos: ['i', 'me', 'my'], neg: [] },
+    people: { pos: ['you', 'we', 'teacher', 'student'], neg: [] },
+    emotion: { pos: ['love', 'like', 'happy'], neg: ['hate', 'sad'] },
+    pet: { pos: ['dog', 'cat', 'pet', 'animal'], neg: [] },
+    food: { pos: ['apple', 'banana', 'fruit', 'eat', 'food'], neg: [] },
+    vehicle: { pos: ['car', 'drive', 'airplane', 'fly', 'bicycle'], neg: [] },
+    place: { pos: ['museum', 'school', 'home', 'park', 'library'], neg: [] },
+    learning: { pos: ['school', 'teacher', 'student', 'study', 'learn'], neg: [] }
+  };
+  const vector = Object.values(concepts).map(({ pos, neg }) =>
+    (pos.filter((term) => words.includes(term)).length -
+    neg.filter((term) => words.includes(term)).length) / Math.max(words.length, 1)
+  );
+  return { text, vector };
+}
+
+function tokenize(text) {
+  return text.toLowerCase().match(/[a-z]+/g) || [];
+}
+
+function cosineSimilarity(a, b) {
   const dot = a.reduce((sum, value, i) => sum + value * b[i], 0);
-  const magA = Math.hypot(...a);
-  const magB = Math.hypot(...b);
-  return dot / (magA * magB);
+  const magnitude = Math.hypot(...a) * Math.hypot(...b);
+  return magnitude ? dot / magnitude : 0;
 }`
   }
 };

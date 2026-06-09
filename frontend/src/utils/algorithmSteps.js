@@ -37,6 +37,7 @@ export function buildSteps(algorithm, values, target) {
 
   if (algorithm.category === 'machine-learning') {
     if (algorithm.slug === 'knn') return withRoundCounts(knnSteps(values, target));
+    if (algorithm.slug === 'vector-search') return withRoundCounts(vectorSearchSteps(values, target));
 
     return withRoundCounts([
       { message: 'Convert every item into a vector.' },
@@ -46,10 +47,13 @@ export function buildSteps(algorithm, values, target) {
   }
 
   if (algorithm.category === 'sort') {
-    return withRoundCounts(values.map((_, index) => ({
-      active: [index, Math.min(index + 1, values.length - 1)],
-      message: `Compare and place values around index ${index}.`
-    })));
+    if (algorithm.slug === 'bucket-sort') return withRoundCounts(bucketSortSteps(values));
+    if (algorithm.slug === 'bubble-sort') return withRoundCounts(bubbleSortSteps(values));
+    if (algorithm.slug === 'selection-sort') return withRoundCounts(selectionSortSteps(values));
+    if (algorithm.slug === 'merge-sort') return withRoundCounts(mergeSortSteps(values));
+    if (algorithm.slug === 'quick-sort') return withRoundCounts(quickSortSteps(values));
+    if (algorithm.slug === 'heap-sort') return withRoundCounts(heapSortSteps(values));
+    return withRoundCounts(movingSortSteps(values, algorithm.name));
   }
 
   if (algorithm.category === 'search') {
@@ -60,6 +64,33 @@ export function buildSteps(algorithm, values, target) {
   }
 
   return withRoundCounts([{ message: 'No animation available for this algorithm.' }]);
+}
+
+export function buildKnnPreview(input, target) {
+  const items = parseKnnItems(input);
+  const rawItems = items.map((item) => item.raw);
+  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'Target', rawItems, true);
+
+  return {
+    points: items,
+    query,
+    compareTo: items.map((item) => item.id),
+    phase: 'Target comparison',
+    detail: 'Enter a text target, then press Play to compare its distance to every training item.'
+  };
+}
+
+export function buildVectorPreview(input, target) {
+  const items = parseVectorItems(input);
+  const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
+
+  return {
+    points: items,
+    query,
+    compareTo: items.map((item) => item.id),
+    phase: 'Vector comparison',
+    detail: 'Enter a text query, then press Play to compare similarity against every item.'
+  };
 }
 
 function withRoundCounts(steps) {
@@ -313,6 +344,643 @@ function interpolationSearchSteps(values, target) {
   return steps;
 }
 
+function bubbleSortSteps(values) {
+  const array = values.map((value, index) => ({ id: `item-${index}`, value }));
+  const steps = [{
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: [],
+    phase: 'Start',
+    codeLines: [2],
+    message: 'Start with the unsorted boxes.',
+    detail: 'Bubble sort compares two neighboring boxes. If the left box is bigger, the two boxes swap places.'
+  }];
+
+  for (let pass = 0; pass < array.length - 1; pass++) {
+    for (let index = 0; index < array.length - pass - 1; index++) {
+      const shouldSwap = array[index].value > array[index + 1].value;
+      steps.push({
+        items: snapshotSortItems(array),
+        active: [index, index + 1],
+        sorted: range(array.length - pass, array.length),
+        phase: `Compare ${index} and ${index + 1}`,
+        codeLines: [4, 5],
+        message: shouldSwap ? `Swap ${array[index].value} and ${array[index + 1].value}.` : `Keep ${array[index].value} and ${array[index + 1].value}.`,
+        detail: shouldSwap
+          ? `${array[index].value} is bigger than ${array[index + 1].value}, so the boxes move and trade places.`
+          : `${array[index].value} is already before ${array[index + 1].value}, so the boxes stay where they are.`
+      });
+
+      if (shouldSwap) {
+        [array[index], array[index + 1]] = [array[index + 1], array[index]];
+        steps.push({
+          items: snapshotSortItems(array),
+          active: [index, index + 1],
+          swapped: [index, index + 1],
+          swap: { left: index, right: index + 1 },
+          sorted: range(array.length - pass, array.length),
+          phase: 'Move boxes',
+          codeLines: [6],
+          message: 'The two boxes have moved.',
+          detail: `Now ${array[index].value} is on the left and ${array[index + 1].value} is on the right.`
+        });
+      }
+    }
+  }
+
+  steps.push({
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: range(0, array.length),
+    phase: 'Sorted',
+    message: 'All boxes are in order.',
+    detail: 'Every pass moved larger values to the right until the full row became sorted.'
+  });
+
+  return steps;
+}
+
+function selectionSortSteps(values) {
+  const array = values.map((value, index) => ({ id: `item-${index}`, value }));
+  const steps = [{
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: [],
+    phase: 'Start',
+    codeLines: [2],
+    message: 'Start with the unsorted boxes.',
+    detail: 'Selection sort finds the smallest remaining box and moves it into the next sorted position.'
+  }];
+
+  for (let position = 0; position < array.length; position++) {
+    let minIndex = position;
+    steps.push({
+      items: snapshotSortItems(array),
+      active: [position],
+      sorted: range(0, position),
+      marker: minIndex,
+      phase: `Position ${position}`,
+      codeLines: [3, 4],
+      message: `Find the smallest box for position ${position}.`,
+      detail: `The sorted area ends before position ${position}. Search the remaining boxes for the smallest value.`
+    });
+
+    for (let scan = position + 1; scan < array.length; scan++) {
+      const foundNewMin = array[scan].value < array[minIndex].value;
+      steps.push({
+        items: snapshotSortItems(array),
+        active: [minIndex, scan],
+        sorted: range(0, position),
+        marker: foundNewMin ? scan : minIndex,
+        phase: `Scan ${scan}`,
+        codeLines: [5, 6],
+        message: foundNewMin ? `${array[scan].value} becomes the new smallest.` : `${array[minIndex].value} is still the smallest.`,
+        detail: foundNewMin
+          ? `${array[scan].value} is smaller than ${array[minIndex].value}, so remember this box as the smallest.`
+          : `${array[scan].value} is not smaller than ${array[minIndex].value}, so keep the current smallest box.`
+      });
+      if (foundNewMin) minIndex = scan;
+    }
+
+    if (minIndex !== position) {
+      [array[position], array[minIndex]] = [array[minIndex], array[position]];
+      steps.push({
+        items: snapshotSortItems(array),
+        active: [position, minIndex],
+        swapped: [position, minIndex],
+        swap: { left: position, right: minIndex },
+        sorted: range(0, position + 1),
+        phase: 'Move smallest',
+        codeLines: [8],
+        message: `Move ${array[position].value} into sorted position ${position}.`,
+        detail: `The smallest remaining box moves into position ${position}.`
+      });
+    } else {
+      steps.push({
+        items: snapshotSortItems(array),
+        active: [position],
+        sorted: range(0, position + 1),
+        phase: 'Already placed',
+        codeLines: [8],
+        message: `${array[position].value} is already in the right place.`,
+        detail: `No swap is needed because the smallest remaining box is already at position ${position}.`
+      });
+    }
+  }
+
+  return steps;
+}
+
+function movingSortSteps(values, algorithmName) {
+  const array = values.map((value, index) => ({ id: `item-${index}`, value }));
+  const sortedTarget = [...values].sort((a, b) => a - b);
+  const steps = [{
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: [],
+    phase: 'Start',
+    message: 'Start with the unsorted boxes.',
+    detail: `${algorithmName} rearranges the boxes until the row is ordered from smallest to largest.`
+  }];
+
+  for (let position = 0; position < sortedTarget.length; position++) {
+    const targetValue = sortedTarget[position];
+    const currentIndex = array.findIndex((item, index) => index >= position && item.value === targetValue);
+    steps.push({
+      items: snapshotSortItems(array),
+      active: [position, currentIndex],
+      sorted: range(0, position),
+      phase: `Place ${targetValue}`,
+      message: `Move ${targetValue} into position ${position}.`,
+      detail: `Find the next smallest box, then move it into the next open sorted position.`
+    });
+
+    if (currentIndex !== position) {
+      [array[position], array[currentIndex]] = [array[currentIndex], array[position]];
+      steps.push({
+        items: snapshotSortItems(array),
+        active: [position, currentIndex],
+        swapped: [position, currentIndex],
+        swap: { left: position, right: currentIndex },
+        sorted: range(0, position + 1),
+        phase: 'Move box',
+        message: `${targetValue} moved into place.`,
+        detail: `The box changed position, so the sorted area grows by one box.`
+      });
+    }
+  }
+
+  steps.push({
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: range(0, array.length),
+    phase: 'Sorted',
+    message: 'All boxes are in order.',
+    detail: 'The row now matches the sorted order.'
+  });
+
+  return steps;
+}
+
+function quickSortSteps(values) {
+  const array = values.map((value, index) => ({ id: `item-${index}`, value }));
+  const sorted = new Set();
+  const steps = [{
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: [],
+    phase: 'Start',
+    codeLines: [1],
+    message: 'Start with the full row.',
+    detail: 'Quicksort chooses a pivot, covers that section, then divides smaller values to the left and larger values to the right.'
+  }];
+
+  function addStep(step) {
+    steps.push({
+      items: snapshotSortItems(array),
+      sorted: [...sorted],
+      ...step
+    });
+  }
+
+  function sortRange(low, high) {
+    if (low > high) return;
+
+    if (low === high) {
+      sorted.add(low);
+      addStep({
+        active: [low],
+        partition: { start: low, end: high, pivotIndex: low, pivotValue: array[low].value },
+        marker: low,
+        phase: `Single box ${low}`,
+        codeLines: [2],
+        message: `${array[low].value} is already sorted.`,
+        detail: 'A section with one box does not need more dividing.'
+      });
+      return;
+    }
+
+    const pivotIndex = high;
+    const pivotValue = array[pivotIndex].value;
+    let storeIndex = low;
+
+    addStep({
+      active: range(low, high + 1),
+      partition: { start: low, end: high, pivotIndex, pivotValue },
+      marker: pivotIndex,
+      phase: `Pivot ${pivotValue}`,
+      codeLines: [3, 4],
+      message: `Use ${pivotValue} as the pivot.`,
+      detail: `The covered section is indexes ${low} to ${high}. The pivot is ${pivotValue}, so smaller boxes move before it and larger boxes stay after it.`
+    });
+
+    for (let scan = low; scan < high; scan++) {
+      const movesLeft = array[scan].value < pivotValue;
+      addStep({
+        active: [scan, pivotIndex],
+        partition: { start: low, end: high, pivotIndex, pivotValue },
+        marker: pivotIndex,
+        phase: `Compare ${array[scan].value}`,
+        codeLines: movesLeft ? [5, 6] : [5],
+        message: movesLeft ? `${array[scan].value} goes left of pivot ${pivotValue}.` : `${array[scan].value} stays right of pivot ${pivotValue}.`,
+        detail: movesLeft
+          ? `${array[scan].value} is smaller than the pivot ${pivotValue}, so it belongs in the left part of this covered section.`
+          : `${array[scan].value} is not smaller than the pivot ${pivotValue}, so it remains in the right part for now.`
+      });
+
+      if (movesLeft) {
+        if (scan !== storeIndex) {
+          [array[storeIndex], array[scan]] = [array[scan], array[storeIndex]];
+          addStep({
+            active: [storeIndex, scan],
+            swapped: [storeIndex, scan],
+            swap: { left: storeIndex, right: scan },
+            partition: { start: low, end: high, pivotIndex: high, pivotValue },
+            marker: high,
+            phase: 'Move left',
+            codeLines: [7, 8, 9, 10],
+            message: `${array[storeIndex].value} moved into the left part.`,
+            detail: `The left part grows because this value is smaller than pivot ${pivotValue}.`
+          });
+        }
+        storeIndex++;
+      }
+    }
+
+    if (storeIndex !== high) {
+      [array[storeIndex], array[high]] = [array[high], array[storeIndex]];
+      addStep({
+        active: [storeIndex, high],
+        swapped: [storeIndex, high],
+        swap: { left: storeIndex, right: high },
+        partition: { start: low, end: high, pivotIndex: storeIndex, pivotValue },
+        marker: storeIndex,
+        phase: 'Place pivot',
+        codeLines: [13, 14, 15],
+        message: `Put pivot ${pivotValue} between the two parts.`,
+        detail: `Now every box left of ${pivotValue} is smaller, and every box right of it is greater or equal.`
+      });
+    }
+
+    sorted.add(storeIndex);
+    addStep({
+      active: [storeIndex],
+      partition: { start: low, end: high, pivotIndex: storeIndex, pivotValue },
+      marker: storeIndex,
+      phase: `Pivot fixed at ${storeIndex}`,
+      codeLines: [17, 18],
+      message: `Pivot ${pivotValue} is in its final position.`,
+      detail: 'Quicksort now repeats the same pivot divide on the left and right sections.'
+    });
+
+    sortRange(low, storeIndex - 1);
+    sortRange(storeIndex + 1, high);
+  }
+
+  sortRange(0, array.length - 1);
+
+  steps.push({
+    items: snapshotSortItems(array),
+    active: [],
+    sorted: range(0, array.length),
+    phase: 'Sorted',
+    message: 'All boxes are in order.',
+    detail: 'Every pivot divided its covered section until the full row became sorted.'
+  });
+
+  return steps;
+}
+
+function heapSortSteps(values) {
+  const heap = values.map((value, index) => ({ id: `item-${index}`, value }));
+  const steps = [{
+    heapItems: snapshotSortItems(heap),
+    heapSize: heap.length,
+    active: [],
+    sorted: [],
+    phase: 'Start',
+    codeLines: [1],
+    message: 'Start with the array as a binary tree.',
+    detail: 'Heap sort first views the array as a tree. Each parent uses array index rules: left child is 2i + 1, right child is 2i + 2.'
+  }];
+
+  if (!heap.length) {
+    return [{ message: 'No data to sort.' }];
+  }
+
+  function addHeapStep(step) {
+    steps.push({
+      heapItems: snapshotSortItems(heap),
+      heapSize: heap.length,
+      sorted: range(step.heapSize ?? heap.length, heap.length),
+      ...step
+    });
+  }
+
+  function siftDown(rootIndex, heapSize, context) {
+    let root = rootIndex;
+
+    while (true) {
+      const left = 2 * root + 1;
+      const right = 2 * root + 2;
+      let largest = root;
+      const children = [left, right].filter((index) => index < heapSize);
+
+      if (!children.length) {
+        addHeapStep({
+          heapSize,
+          active: [root],
+          phase: `${context}: leaf`,
+          codeLines: [4, 5, 6],
+          message: `${heap[root].value} has no children inside the heap.`,
+          detail: 'This node is already a leaf in the active heap, so it cannot move down any farther.'
+        });
+        return;
+      }
+
+      addHeapStep({
+        heapSize,
+        active: [root, ...children],
+        phase: `${context}: compare`,
+        codeLines: [4, 5, 6],
+        message: `Compare parent ${heap[root].value} with its child node${children.length === 1 ? '' : 's'}.`,
+        detail: `A max heap needs every parent to be greater than or equal to its children. Check ${heap[root].value}${children.map((index) => `, ${heap[index].value}`).join('')}.`
+      });
+
+      if (left < heapSize && heap[left].value > heap[largest].value) largest = left;
+      if (right < heapSize && heap[right].value > heap[largest].value) largest = right;
+
+      if (largest === root) {
+        addHeapStep({
+          heapSize,
+          active: [root, ...children],
+          phase: `${context}: valid`,
+          codeLines: [7],
+          message: `${heap[root].value} can stay above its children.`,
+          detail: 'The parent is already the largest value in this small tree, so this part satisfies the max-heap rule.'
+        });
+        return;
+      }
+
+      [heap[root], heap[largest]] = [heap[largest], heap[root]];
+      addHeapStep({
+        heapSize,
+        active: [root, largest],
+        swapped: [root, largest],
+        phase: `${context}: swap`,
+        codeLines: [8, 9, 10],
+        message: `Swap ${heap[largest].value} with larger child ${heap[root].value}.`,
+        detail: `The larger child moves up so the biggest value in this small tree is closer to the root. Then we keep checking lower in the tree.`
+      });
+
+      root = largest;
+    }
+  }
+
+  for (let index = Math.floor(heap.length / 2) - 1; index >= 0; index--) {
+    addHeapStep({
+      heapSize: heap.length,
+      active: [index],
+      phase: `Heapify node ${index}`,
+      codeLines: [13],
+      message: `Build max heap from node ${index}.`,
+      detail: 'Start at the last parent and move backward. Each heapify makes one subtree obey the max-heap rule.'
+    });
+    siftDown(index, heap.length, 'Build heap');
+  }
+
+  addHeapStep({
+    heapSize: heap.length,
+    active: [0],
+    phase: 'Max heap ready',
+    codeLines: [13],
+    message: `${heap[0].value} is now the largest value at the root.`,
+    detail: 'The tree is a max heap, so the root holds the largest remaining number.'
+  });
+
+  for (let end = heap.length - 1; end > 0; end--) {
+    [heap[0], heap[end]] = [heap[end], heap[0]];
+    addHeapStep({
+      heapSize: end,
+      active: [0, end],
+      swapped: [0, end],
+      sorted: range(end, heap.length),
+      phase: `Move max to index ${end}`,
+      codeLines: [15, 16],
+      message: `Move ${heap[end].value} into the sorted output.`,
+      detail: `The root is the largest value in the heap, so it swaps with the last unsorted position. Index ${end} is now finished.`
+    });
+
+    siftDown(0, end, 'Restore heap');
+  }
+
+  steps.push({
+    heapItems: snapshotSortItems(heap),
+    heapSize: 0,
+    active: [],
+    sorted: range(0, heap.length),
+    phase: 'Sorted',
+    codeLines: [18],
+    message: 'All tree nodes are sorted.',
+    detail: 'Each round moved the largest remaining root into the output, so the final array is ordered from smallest to largest.'
+  });
+
+  return steps;
+}
+
+function bucketSortSteps(values) {
+  const items = values.map((value, index) => ({ id: `item-${index}`, value }));
+  if (!items.length) {
+    return [{ message: 'No data to sort.' }];
+  }
+
+  const bucketCount = Math.min(5, Math.max(3, Math.ceil(Math.sqrt(items.length))));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const buckets = Array.from({ length: bucketCount }, () => []);
+  const steps = [{
+    buckets: snapshotBucketState(buckets),
+    output: [],
+    phase: 'Start',
+    message: 'Start with the unsorted boxes.',
+    detail: `Bucket sort spreads the numbers across ${bucketCount} buckets, sorts inside each bucket, then collects everything back into one sorted row.`
+  }];
+
+  items.forEach((item) => {
+    const bucketIndex = getBucketIndex(item.value, min, max, bucketCount);
+    buckets[bucketIndex].push(item);
+    steps.push({
+      buckets: snapshotBucketState(buckets),
+      output: [],
+      activeItem: item.id,
+      activeBucket: bucketIndex,
+      phase: `Put ${item.value}`,
+      message: `Put ${item.value} into bucket ${bucketIndex + 1}.`,
+      detail: `The value ${item.value} belongs in bucket ${bucketIndex + 1}, so it moves into that bucket first.`
+    });
+  });
+
+  const sortedBuckets = buckets.map((bucket) => [...bucket].sort((a, b) => a.value - b.value));
+  steps.push({
+    buckets: snapshotBucketState(sortedBuckets),
+    output: [],
+    phase: 'Sort buckets',
+    message: 'Sort each bucket inside itself.',
+    detail: 'Numbers inside each bucket are sorted before the buckets are joined together.'
+  });
+
+  const output = [];
+  sortedBuckets.forEach((bucket, bucketIndex) => {
+    steps.push({
+      buckets: snapshotBucketState(sortedBuckets),
+      output: snapshotSortItems(output),
+      activeBucket: bucketIndex,
+      phase: `Collect bucket ${bucketIndex + 1}`,
+      message: `Collect numbers from bucket ${bucketIndex + 1}.`,
+      detail: `Take the sorted numbers from bucket ${bucketIndex + 1} and move them into the output row.`
+    });
+
+    bucket.forEach((item) => {
+      output.push(item);
+      steps.push({
+        buckets: snapshotBucketState(sortedBuckets),
+        output: snapshotSortItems(output),
+        activeBucket: bucketIndex,
+        activeItem: item.id,
+        phase: `Move ${item.value}`,
+        message: `Move ${item.value} to the output row.`,
+        detail: `The smallest item in the current bucket moves to the final row next.`
+      });
+    });
+  });
+
+  steps.push({
+    buckets: snapshotBucketState(sortedBuckets),
+    output: snapshotSortItems(output),
+    phase: 'Sorted',
+    message: 'All numbers are back together in sorted order.',
+    detail: 'The output row now shows the final sorted list.'
+  });
+
+  return steps;
+}
+
+function mergeSortSteps(values) {
+  if (!values.length) {
+    return [{ message: 'No data to sort.' }];
+  }
+
+  const splitRows = buildMergeSplitRows(values);
+  const mergeRows = buildMergeRows(splitRows.at(-1));
+  const rows = [
+    ...splitRows.map((groups, index) => ({
+      mode: 'split',
+      label: index === 0 ? 'Start' : `Split row ${index}`,
+      groups
+    })),
+    ...mergeRows.map((groups, index) => ({
+      mode: 'merge',
+      label: `Merge row ${index + 1}`,
+      groups
+    }))
+  ];
+
+  return rows.map((row, index) => {
+    const revealedRows = rows.slice(0, index + 1);
+    const isFirst = index === 0;
+    const isFinal = index === rows.length - 1;
+    const isSplit = row.mode === 'split';
+    const groupText = row.groups.length === 1 ? '1 group' : `${row.groups.length} groups`;
+
+    return {
+      mergeRows: revealedRows,
+      activeMergeRow: index,
+      codeLines: isFirst ? [1] : isSplit ? [2, 3, 4, 5] : isFinal ? [11] : [8, 9],
+      phase: isFirst ? 'Start' : isSplit ? row.label : isFinal ? 'Sorted' : row.label,
+      message: isFirst
+        ? 'Start with the full array.'
+        : isSplit
+          ? `Split into ${groupText}.`
+          : isFinal
+            ? 'The final merged row is sorted.'
+            : `Merge into ${groupText}.`,
+      detail: isFirst
+        ? 'Merge sort starts by looking at the whole array as one box.'
+        : isSplit
+          ? 'Each box is split into left and right halves until every box contains one number.'
+          : isFinal
+            ? 'The last merge combines the sorted halves into one sorted array.'
+            : 'Now neighboring boxes merge back together in sorted order, making larger sorted boxes each row.'
+    };
+  });
+}
+
+function buildMergeSplitRows(values) {
+  const rows = [[values.map((value, index) => ({ id: `item-${index}`, value }))]];
+  let current = rows[0];
+
+  while (current.some((group) => group.length > 1)) {
+    current = current.flatMap((group) => {
+      if (group.length <= 1) return [group];
+      const middle = Math.ceil(group.length / 2);
+      return [group.slice(0, middle), group.slice(middle)];
+    });
+    rows.push(current);
+  }
+
+  return rows;
+}
+
+function buildMergeRows(singleItemGroups) {
+  const rows = [];
+  let current = singleItemGroups;
+
+  while (current.length > 1) {
+    current = current.reduce((next, group, index) => {
+      if (index % 2 === 1) return next;
+      const partner = current[index + 1];
+      if (!partner) return [...next, group];
+      return [...next, mergeSortedGroups(group, partner)];
+    }, []);
+    rows.push(current);
+  }
+
+  return rows;
+}
+
+function mergeSortedGroups(left, right) {
+  const merged = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+
+  while (leftIndex < left.length && rightIndex < right.length) {
+    if (left[leftIndex].value <= right[rightIndex].value) {
+      merged.push(left[leftIndex]);
+      leftIndex++;
+    } else {
+      merged.push(right[rightIndex]);
+      rightIndex++;
+    }
+  }
+
+  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
+}
+
+function snapshotSortItems(array) {
+  return array.map((item) => ({ ...item }));
+}
+
+function snapshotBucketState(buckets) {
+  return buckets.map((bucket) => snapshotSortItems(bucket));
+}
+
+function getBucketIndex(value, min, max, bucketCount) {
+  if (max === min) return 0;
+  const span = max - min + 1;
+  const scaled = Math.floor(((value - min) / span) * bucketCount);
+  return Math.max(0, Math.min(bucketCount - 1, scaled));
+}
+
 function range(start, end) {
   return Array.from({ length: Math.max(0, end - start) }, (_, offset) => start + offset);
 }
@@ -348,7 +1016,7 @@ function knnSteps(input, target) {
       activePoint: item.id,
       measured: distances.slice(0, index + 1).map((entry) => entry.id),
       phase: `Distance ${index + 1}`,
-      codeLines: [5, 6],
+      codeLines: [5, 7],
       message: `Measure distance from target to ${item.raw}.`,
       detail: `${item.raw} is ${item.distance.toFixed(1)} map units from the target. Smaller distance means more similar.`
     })),
@@ -357,7 +1025,7 @@ function knnSteps(input, target) {
       measured: distances.map((item) => item.id),
       nearest: nearest.map((item) => item.id),
       phase: 'Pick nearest',
-      codeLines: [8],
+      codeLines: [10],
       message: 'Choose the 3 closest points.',
       detail: `The nearest neighbors are ${nearest.map((item) => item.raw).join(', ')}. KNN only votes with these closest examples.`
     },
@@ -367,11 +1035,87 @@ function knnSteps(input, target) {
       nearest: nearest.map((item) => item.id),
       prediction,
       phase: 'Vote',
-      codeLines: [9, 10],
+      codeLines: [11],
       message: `Predicted class: ${prediction}.`,
       detail: `The closest examples vote by label, so the target is predicted as "${prediction}".`
     }
   ];
+}
+
+function vectorSearchSteps(input, target) {
+  const items = parseVectorItems(input);
+  const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
+  const queryTokens = tokenizeText(query.raw);
+  const ranked = items
+    .map((item) => ({
+      ...item,
+      similarity: cosineSimilarity(item.vector, query.vector)
+    }))
+    .sort((a, b) => b.similarity - a.similarity);
+  const positiveMatches = ranked.filter((item) => item.similarity > 0);
+  const topMatches = positiveMatches.slice(0, Math.min(3, positiveMatches.length));
+  const base = { points: items, query, nearest: [] };
+
+  if (!items.length) {
+    return [{ message: 'Add text items first so vector search can map them.' }];
+  }
+
+  return [
+    {
+      ...base,
+      phase: 'Embed text',
+      codeLines: [2, 3],
+      message: 'Convert each item and the query into vectors.',
+      detail: `First split the query into words: ${queryTokens.join(', ')}. Then vector search builds an 8D vector [self, people, emotion, pet, food, vehicle, place, learning] and scores matches with cosine similarity only.`
+    },
+    ...ranked.map((item, index) => ({
+      ...base,
+      activePoint: item.id,
+      measured: ranked.slice(0, index + 1).map((entry) => entry.id),
+      phase: `Similarity ${index + 1}`,
+      codeLines: [5, 7],
+      message: `Compare query to ${item.raw}.`,
+      detail: `"${item.raw}" has cosine similarity ${item.similarity.toFixed(2)} with the query. The range is -1 opposite, 0 unrelated, and 1 same direction.`
+    })),
+    {
+      ...base,
+      measured: ranked.map((item) => item.id),
+      nearest: topMatches.map((item) => item.id),
+      prediction: topMatches.map((item) => item.raw).join(', '),
+      phase: 'Rank matches',
+      codeLines: [10],
+      message: 'Return the most similar items.',
+      detail: topMatches.length
+        ? `The closest vector matches are ${topMatches.map((item) => item.raw).join(', ')}.`
+        : 'No sample word has a positive similarity score for this query.'
+    }
+  ];
+}
+
+function parseVectorItems(input) {
+  const rawItems = Array.isArray(input)
+    ? input.map((item) => String(item))
+    : String(input || '').split(',').map((item) => item.trim()).filter(Boolean);
+
+  return rawItems.map((raw, index) => buildVectorPoint(raw, false, index));
+}
+
+function buildVectorPoint(raw, isQuery = false, index = 0) {
+  const vector = semanticVector(raw);
+  const label = dominantVectorLabel(vector);
+  const anchor = vectorAnchors[label] || vectorAnchors.general;
+  const spread = pointSpread[index % pointSpread.length];
+  const jitter = ((hashText(raw.toLowerCase()) % 5) - 2) * 0.8;
+
+  return {
+    id: isQuery ? 'query' : `v-${index}`,
+    raw,
+    label,
+    vector,
+    x: Math.max(8, Math.min(92, anchor.x + (isQuery ? 0 : spread.x + jitter))),
+    y: Math.max(10, Math.min(90, anchor.y + (isQuery ? 0 : spread.y - jitter))),
+    feature: label
+  };
 }
 
 function parseKnnItems(input) {
@@ -406,22 +1150,113 @@ function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0) {
   }
 
   const word = raw.toLowerCase();
-  const maxLength = Math.max(...allItems.map((item) => String(item).length), raw.length, 1);
-  const firstCode = word.charCodeAt(0) || 97;
+  const category = getTextCategory(word);
+  const anchor = categoryAnchors[category] || categoryAnchors.text;
+  const xOffset = ((hashText(word) % 17) - 8) * 0.9;
+  const yOffset = ((hashText([...word].reverse().join('')) % 17) - 8) * 0.9;
+
   return {
     id: isQuery ? 'target' : `p-${index}`,
     raw,
     label,
-    x: 12 + (raw.length / maxLength) * 76,
-    y: 82 - ((firstCode - 97) / 25) * 58,
-    feature: `length ${raw.length}`
+    x: Math.max(10, Math.min(90, anchor.x + xOffset)),
+    y: Math.max(12, Math.min(88, anchor.y + yOffset)),
+    feature: category
   };
 }
 
 function getKnnLabel(raw, numericMedian) {
   const number = Number(raw);
   if (Number.isFinite(number)) return number >= numericMedian ? 'high' : 'low';
-  return raw.length >= 6 ? 'long text' : 'short text';
+  return getTextCategory(raw.toLowerCase());
+}
+
+const categoryAnchors = {
+  fruit: { x: 20, y: 24 },
+  animal: { x: 78, y: 24 },
+  vehicle: { x: 22, y: 76 },
+  place: { x: 78, y: 76 },
+  text: { x: 50, y: 50 }
+};
+
+const textCategories = {
+  fruit: ['apple', 'banana', 'mango', 'kiwi', 'grape', 'peach', 'pear', 'orange', 'melon', 'berry'],
+  animal: ['tiger', 'dolphin', 'lion', 'cat', 'dog', 'bird', 'horse', 'zebra', 'shark'],
+  vehicle: ['bicycle', 'airplane', 'car', 'bus', 'train', 'truck', 'boat', 'ship', 'motorcycle', 'helicopter'],
+  place: ['school', 'museum', 'park', 'library', 'market', 'airport', 'station', 'city', 'beach', 'zoo']
+};
+
+function getTextCategory(word) {
+  return Object.entries(textCategories).find(([, words]) => words.includes(word))?.[0] || 'text';
+}
+
+function hashText(text) {
+  return [...text].reduce((total, char) => total + char.charCodeAt(0), 0);
+}
+
+const semanticConcepts = {
+  self: { positive: ['i', 'me', 'my', 'mine'], negative: [] },
+  people: { positive: ['you', 'we', 'they', 'person', 'people', 'teacher', 'student'], negative: [] },
+  emotion: { positive: ['love', 'like', 'happy', 'cute'], negative: ['hate', 'sad'] },
+  pet: { positive: ['dog', 'dogs', 'cat', 'cats', 'pet', 'pets', 'animal'], negative: [] },
+  food: { positive: ['apple', 'banana', 'fruit', 'eat', 'eating', 'food', 'hungry', 'have'], negative: [] },
+  vehicle: { positive: ['car', 'drive', 'driving', 'airplane', 'plane', 'fly', 'bicycle', 'bike', 'travel'], negative: [] },
+  place: { positive: ['museum', 'school', 'home', 'park', 'visit', 'class', 'library', 'airport'], negative: [] },
+  learning: { positive: ['school', 'teacher', 'student', 'study', 'class', 'library', 'learn'], negative: [] }
+};
+
+const vectorLabels = ['self', 'people', 'emotion', 'pet', 'food', 'vehicle', 'place', 'learning'];
+
+const vectorAnchors = {
+  self: { x: 44, y: 50 },
+  people: { x: 58, y: 50 },
+  emotion: { x: 50, y: 24 },
+  pet: { x: 78, y: 24 },
+  food: { x: 20, y: 24 },
+  vehicle: { x: 22, y: 76 },
+  place: { x: 78, y: 76 },
+  learning: { x: 62, y: 78 },
+  general: { x: 50, y: 50 }
+};
+
+const pointSpread = [
+  { x: 0, y: -9 },
+  { x: 10, y: 0 },
+  { x: 0, y: 9 },
+  { x: -10, y: 0 },
+  { x: 8, y: -8 },
+  { x: 8, y: 8 },
+  { x: -8, y: 8 },
+  { x: -8, y: -8 }
+];
+
+function semanticVector(text) {
+  const words = tokenizeText(text);
+  const scores = vectorLabels.map((label) => {
+    const { positive, negative } = semanticConcepts[label];
+    const positiveMatches = words.filter((word) => positive.includes(word)).length;
+    const negativeMatches = words.filter((word) => negative.includes(word)).length;
+    return (positiveMatches - negativeMatches) / Math.max(words.length, 1);
+  });
+  const hasSignal = scores.some((score) => score !== 0);
+  return hasSignal ? scores : vectorLabels.map(() => 0.1);
+}
+
+function tokenizeText(text) {
+  return String(text).toLowerCase().match(/[a-z]+/g) || [];
+}
+
+function dominantVectorLabel(vector) {
+  const magnitudes = vector.map((value) => Math.abs(value));
+  const max = Math.max(...magnitudes);
+  if (max <= 0.1) return 'general';
+  return vectorLabels[magnitudes.indexOf(max)];
+}
+
+function cosineSimilarity(a, b) {
+  const dot = a.reduce((sum, value, index) => sum + value * b[index], 0);
+  const magnitude = Math.hypot(...a) * Math.hypot(...b);
+  return magnitude ? dot / magnitude : 0;
 }
 
 function chooseKnnLabel(nearest) {
