@@ -24,7 +24,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['student', 'admin'],
       default: 'student'
-    }
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    verificationToken: String,
+    verificationTokenExpires: Date
   },
   { timestamps: true }
 );
@@ -38,7 +44,9 @@ userSchema.statics.createWithPassword = async function createWithPassword(data) 
   return this.create({
     name: data.name,
     email: data.email,
-    passwordHash
+    passwordHash,
+    verificationToken: data.verificationToken,
+    verificationTokenExpires: data.verificationTokenExpires
   });
 };
 

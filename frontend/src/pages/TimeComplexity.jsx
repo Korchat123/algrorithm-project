@@ -22,6 +22,21 @@ const notations = [
   }
 ];
 
+const complexityBasics = [
+  {
+    title: '1. Time complexity',
+    label: 'Running work',
+    example: 'Example: one loop over n items is O(n)',
+    text: 'Time complexity describes how the number of operations grows when the input gets bigger. It helps you compare algorithms by their growth pattern instead of exact seconds.'
+  },
+  {
+    title: '2. Space complexity',
+    label: 'Memory use',
+    example: 'Example: storing a new array of n items is O(n)',
+    text: 'Space complexity describes how much extra memory an algorithm needs as the input grows. It counts new arrays, objects, recursion stacks, and other temporary storage.'
+  }
+];
+
 const growthRates = [
   {
     notation: 'O(1)',
@@ -72,6 +87,17 @@ export function TimeComplexity() {
           seconds because computers run at different speeds; it measures the growth pattern of the work.
         </p>
       </div>
+
+      <section className="complexity-basics">
+        {complexityBasics.map((item) => (
+          <article className="complexity-card" key={item.title}>
+            <span>{item.label}</span>
+            <h2>{item.title}</h2>
+            <strong>{item.example}</strong>
+            <p>{item.text}</p>
+          </article>
+        ))}
+      </section>
 
       <section className="complexity-overview">
         {notations.map((item) => (

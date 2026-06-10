@@ -13,12 +13,27 @@ const gameSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['understand', 'quiz', 'implementation'],
+      enum: ['understand', 'quiz', 'implementation', 'game'],
       required: true
+    },
+    level: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 5
+    },
+    mode: {
+      type: String,
+      enum: ['standard', 'time-attack'],
+      default: 'standard'
     },
     prompt: {
       type: String,
       required: true
+    },
+    difficultyParams: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     },
     choices: [String],
     correctAnswer: String,

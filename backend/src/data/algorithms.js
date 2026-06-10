@@ -5,6 +5,11 @@ export const algorithms = [
     category: 'search',
     summary: 'Checks each item one by one until the target is found or the list ends.',
     bigO: { best: 'O(1)', average: 'O(n)', worst: 'O(n)', space: 'O(1)' },
+    demo: {
+      input: '14, 7, 29, 3, 18, 41, 10, 24',
+      target: '41',
+      note: 'Target is near the end so linear search visibly scans several values.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -31,6 +36,11 @@ export const algorithms = [
     category: 'search',
     summary: 'Repeatedly halves a sorted search space to find a target value.',
     bigO: { best: 'O(1)', average: 'O(log n)', worst: 'O(log n)', space: 'O(1)' },
+    demo: {
+      input: '3, 7, 10, 14, 18, 24, 29, 41',
+      target: '24',
+      note: 'Sorted numeric data lets binary search repeatedly halve the range.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -67,6 +77,11 @@ export const algorithms = [
     category: 'search',
     summary: 'Skips forward by block size, then linearly scans inside the likely block.',
     bigO: { best: 'O(1)', average: 'O(sqrt n)', worst: 'O(sqrt n)', space: 'O(1)' },
+    demo: {
+      input: '3, 7, 10, 14, 18, 24, 29, 41, 52, 67, 73, 88',
+      target: '67',
+      note: 'A longer sorted list makes the jump blocks visible before the local scan.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -93,6 +108,11 @@ export const algorithms = [
     category: 'search',
     summary: 'Estimates the likely target position in sorted, evenly distributed data.',
     bigO: { best: 'O(1)', average: 'O(log log n)', worst: 'O(n)', space: 'O(1)' },
+    demo: {
+      input: '5, 10, 15, 20, 25, 30, 35, 40, 45',
+      target: '35',
+      note: 'Evenly spaced values make interpolation search estimate useful positions.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -117,6 +137,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Repeatedly swaps adjacent out-of-order items until the array is sorted.',
     bigO: { best: 'O(n)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' },
+    demo: {
+      input: '14, 7, 29, 3, 18, 41, 10, 24',
+      target: '18',
+      note: 'Unsorted numbers create visible adjacent swaps.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -140,6 +165,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Selects the smallest remaining item and moves it to the sorted side.',
     bigO: { best: 'O(n^2)', average: 'O(n^2)', worst: 'O(n^2)', space: 'O(1)' },
+    demo: {
+      input: '29, 14, 3, 41, 10, 24, 7, 18',
+      target: '18',
+      note: 'The smallest remaining value appears in different positions each round.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -163,6 +193,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Splits data into halves, sorts the halves, and merges them back together.',
     bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' },
+    demo: {
+      input: '38, 12, 27, 5, 44, 19, 31, 8',
+      target: '19',
+      note: 'Eight values make a balanced merge tree.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -186,6 +221,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Partitions around a pivot, then recursively sorts each side.',
     bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n^2)', space: 'O(log n)' },
+    demo: {
+      input: '33, 12, 45, 7, 26, 19, 50, 3',
+      target: '26',
+      note: 'Mixed values show pivot partitioning on both sides.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -207,6 +247,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Builds a heap and repeatedly extracts the largest item into sorted position.',
     bigO: { best: 'O(n log n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(1)' },
+    demo: {
+      input: '22, 9, 37, 4, 18, 31, 12',
+      target: '18',
+      note: 'Seven values form a readable heap tree.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -239,6 +284,11 @@ export const algorithms = [
     category: 'sort',
     summary: 'Distributes values into buckets, sorts each bucket, then joins the buckets.',
     bigO: { best: 'O(n + k)', average: 'O(n + k)', worst: 'O(n^2)', space: 'O(n + k)' },
+    demo: {
+      input: '8, 42, 15, 23, 4, 16, 35, 39, 27, 11',
+      target: '23',
+      note: 'Spread-out values make bucket placement easier to see.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -261,6 +311,11 @@ export const algorithms = [
     category: 'graph',
     summary: 'Visits graph nodes level by level using a queue.',
     bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' },
+    demo: {
+      input: 'A: B C; B: D E; C: F; E: G',
+      target: 'A',
+      note: 'The visualizer uses this fixed graph shape for BFS traversal.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -289,6 +344,11 @@ export const algorithms = [
     category: 'graph',
     summary: 'Follows one path deeply before backtracking to try another branch.',
     bigO: { best: 'O(1)', average: 'O(V + E)', worst: 'O(V + E)', space: 'O(V)' },
+    demo: {
+      input: 'A: B C; B: D E; C: F; E: G',
+      target: 'A',
+      note: 'The visualizer uses this fixed graph shape for DFS traversal.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -307,8 +367,14 @@ export const algorithms = [
     slug: 'knn',
     name: 'K-Nearest Neighbors',
     category: 'machine-learning',
+    detail: 'KNN stores known examples, maps a new target into the same feature space, then lets the closest examples vote for the target class.',
     summary: 'Classifies a point by looking at the labels of the closest known points.',
     bigO: { best: 'O(n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' },
+    demo: {
+      input: 'apple, banana, mango, orange, tiger, dolphin, eagle, kitten, bicycle, airplane, scooter, train, school, museum, library, airport, teacher, student, pizza, noodles',
+      target: 'zoo',
+      note: 'Mixed labeled words give the KNN visualizer enough nearby examples for animals, food, vehicles, places, and people.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
@@ -325,19 +391,104 @@ export const algorithms = [
     ]
   },
   {
-    slug: 'vector-search',
-    name: 'Vector Search',
+    slug: 'ann',
+    name: 'Approximate Nearest Neighbor (ANN)',
     category: 'machine-learning',
-    summary: 'Finds similar items by comparing numeric embedding vectors.',
-    bigO: { best: 'O(d)', average: 'O(n*d)', worst: 'O(n*d)', space: 'O(n*d)' },
+    detail: 'ANN narrows the search to a promising subset of vectors first, then ranks only those candidates. It trades a little accuracy for speed on large indexes.',
+    summary: 'Finds nearby vectors by checking a smaller candidate set first.',
+    bigO: { best: 'O(log n)', average: 'O(log n)', worst: 'O(n)', space: 'O(n)' },
+    demo: {
+      input: 'king, queen, teacher, student, love, happy, elephant, tiger, dog, cat, apple, bread, car, train, airplane, school, forest, library, learn, science',
+      target: 'the king loves the elephant in the forest',
+      note: 'A mixed sample gives ANN enough nearby clusters to narrow before ranking.'
+    },
     codeExamples: [
       {
         language: 'JavaScript',
-        code: `function cosineSimilarity(a, b) {
-  const dot = a.reduce((sum, value, i) => sum + value * b[i], 0);
-  const magA = Math.hypot(...a);
-  const magB = Math.hypot(...b);
-  return dot / (magA * magB);
+        code: `function annSearch(index, queryVector, k = 3) {
+  const candidates = index.findLikelyCluster(queryVector);
+  return candidates
+    .map((item) => ({
+      ...item,
+      similarity: cosineSimilarity(item.vector, queryVector)
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, k);
+}`
+      }
+    ]
+  },
+  {
+    slug: 'hnsw',
+    name: 'HNSW',
+    category: 'machine-learning',
+    detail: 'HNSW builds a layered graph where high layers skip far across the space and lower layers refine the result. It is one of the most common ANN indexes.',
+    summary: 'Uses layered graph links to jump quickly toward similar vectors.',
+    bigO: { best: 'O(log n)', average: 'O(log n)', worst: 'O(n)', space: 'O(n log n)' },
+    demo: {
+      input: 'king, queen, teacher, student, love, happy, elephant, tiger, dog, cat, apple, bread, car, train, airplane, school, forest, library, learn, science',
+      target: 'the king loves the elephant in the forest',
+      note: 'The layered graph is easier to explain when the data spans several semantic groups.'
+    },
+    codeExamples: [
+      {
+        language: 'JavaScript',
+        code: `function hnswSearch(layers, queryVector, k = 3) {
+  let entry = layers.at(-1)[0];
+  for (let level = layers.length - 1; level >= 0; level--) {
+    entry = greedySearch(layers[level], entry, queryVector);
+  }
+  return rankedNeighbors(entry, queryVector).slice(0, k);
+}`
+      }
+    ]
+  },
+  {
+    slug: 'kd-tree',
+    name: 'K-d Tree',
+    category: 'machine-learning',
+    detail: 'A k-d tree recursively splits the vector space on one axis at a time, then searches the most promising side before backtracking to nearby branches.',
+    summary: 'Partitions vectors with axis-aligned splits before checking neighbors.',
+    bigO: { best: 'O(log n)', average: 'O(log n)', worst: 'O(n)', space: 'O(n)' },
+    demo: {
+      input: 'king, queen, teacher, student, love, happy, elephant, tiger, dog, cat, apple, bread, car, train, airplane, school, forest, library, learn, science',
+      target: 'the king loves the elephant in the forest',
+      note: 'Axis-based splits work best when the sample contains a few clear clusters.'
+    },
+    codeExamples: [
+      {
+        language: 'JavaScript',
+        code: `function kdTreeSearch(tree, queryPoint, k = 3) {
+  const best = [];
+  searchNode(tree, queryPoint, best);
+  return best.sort((a, b) => a.distance - b.distance).slice(0, k);
+}`
+      }
+    ]
+  },
+  {
+    slug: 'brute-force-search',
+    name: 'Brute Force Search',
+    category: 'machine-learning',
+    detail: 'Brute force search compares the query against every stored vector. It is simple and exact, but it becomes expensive as the dataset grows.',
+    summary: 'Checks every vector and returns the closest matches.',
+    bigO: { best: 'O(n*d)', average: 'O(n*d)', worst: 'O(n*d)', space: 'O(1)' },
+    demo: {
+      input: 'king, queen, teacher, student, love, happy, elephant, tiger, dog, cat, apple, bread, car, train, airplane, school, forest, library, learn, science',
+      target: 'the king loves the elephant in the forest',
+      note: 'The brute-force example uses the same sample set so its cost difference is obvious.'
+    },
+    codeExamples: [
+      {
+        language: 'JavaScript',
+        code: `function bruteForceSearch(items, queryVector, k = 3) {
+  return items
+    .map((item) => ({
+      ...item,
+      similarity: cosineSimilarity(item.vector, queryVector)
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, k);
 }`
       }
     ]

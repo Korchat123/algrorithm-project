@@ -1,50 +1,42 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronLeft, ChevronRight, Code2, Pause, Play, Shuffle, Square } from 'lucide-react';
-import { useParams } from 'react-router-dom';
-import { algorithms, codeSamples } from '../assets/algorithms.js';
+import { Navigate, useParams } from 'react-router-dom';
 import { Visualizer } from '../components/Visualizer.jsx';
-import { buildKnnPreview, buildSteps, buildVectorPreview, initialValues, parseValues, shuffle } from '../utils/algorithmSteps.js';
-
-const defaultKnnInput = 'apple, banana, tiger, dolphin, bicycle, airplane, school, museum';
-const defaultKnnTarget = 'zoo';
-const defaultVectorInput = 'i, you, love, hate, like, dog, cat, apple, banana, school, museum, airplane, car, home, park, teacher, student';
-const defaultVectorTarget = 'i love dog';
-const realVectorSearchCode = `async function buildVectorIndex(documents, embeddingModel, vectorIndex) {
-  for (const document of documents) {
-    const vector = await embeddingModel.embed(document.text);
-    await vectorIndex.upsert({
-      id: document.id,
-      vector,
-      metadata: { text: document.text }
-    });
-  }
-}
-
-async function vectorSearch(queryText, embeddingModel, vectorIndex) {
-  const queryVector = await embeddingModel.embed(queryText);
-  return vectorIndex.search({
-    vector: queryVector,
-    topK: 3,
-    metric: 'cosine'
-  });
-}`;
+import { fallbackAlgorithms, fetchAlgorithm, samplesForAlgorithm } from '../utils/algorithmData.js';
+import { buildKnnPreview, buildSteps, buildVectorPreview, parseValues, shuffle } from '../utils/algorithmSteps.js';
 
 export function AlgorithmPage() {
   const { slug } = useParams();
-  const algorithm = algorithms.find((item) => item.slug === slug) || algorithms[0];
+  const fallbackAlgorithm = fallbackAlgorithms.find((item) => item.slug === slug) || fallbackAlgorithms[0];
+  const [algorithm, setAlgorithm] = useState(fallbackAlgorithm);
   const isKnn = algorithm.slug === 'knn';
-  const isVectorSearch = algorithm.slug === 'vector-search';
-  const isTextMachineLearning = isKnn || isVectorSearch;
-  const samples = useMemo(() => codeSamples[algorithm.slug] || {}, [algorithm.slug]);
+  const isNearestNeighbor = isNearestNeighborAlgorithm(algorithm.slug);
+  const isTextMachineLearning = isKnn || isNearestNeighbor;
+  const samples = useMemo(() => samplesForAlgorithm(algorithm), [algorithm]);
   const languageOptions = useMemo(() => Object.keys(samples), [samples]);
-  const [values, setValues] = useState(initialValues);
-  const [input, setInput] = useState(initialValues.join(', '));
-  const [target, setTarget] = useState(18);
+  const fallbackDemo = useMemo(() => getFallbackDemo(fallbackAlgorithm), [fallbackAlgorithm]);
+  const [values, setValues] = useState(() => parseValues(fallbackDemo.input));
+  const [input, setInput] = useState(fallbackDemo.input);
+  const [target, setTarget] = useState(fallbackDemo.target);
   const [steps, setSteps] = useState([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [language, setLanguage] = useState('js');
-  const [vectorCodeMode, setVectorCodeMode] = useState('demo');
+
+  useEffect(() => {
+    let active = true;
+    setAlgorithm(fallbackAlgorithm);
+    fetchAlgorithm(slug)
+      .then((item) => {
+        if (active) setAlgorithm(item);
+      })
+      .catch(() => {
+        if (active) setAlgorithm(fallbackAlgorithm);
+      });
+    return () => {
+      active = false;
+    };
+  }, [fallbackAlgorithm, slug]);
 
   useEffect(() => {
     const parsed = parseValues(input);
@@ -61,14 +53,12 @@ export function AlgorithmPage() {
   const knnPreviewStep = useMemo(() => (
     isKnn ? buildKnnPreview(input, target) : null
   ), [input, isKnn, target]);
-  const vectorPreviewStep = useMemo(() => (
-    isVectorSearch ? buildVectorPreview(input, target) : null
-  ), [input, isVectorSearch, target]);
-  const visualStep = isTextMachineLearning ? currentStep || knnPreviewStep || vectorPreviewStep : currentStep;
+  const nnPreviewStep = useMemo(() => (
+    isNearestNeighbor ? buildVectorPreview(input, target, algorithm.slug) : null
+  ), [algorithm.slug, input, isNearestNeighbor, target]);
+  const visualStep = isTextMachineLearning ? currentStep || knnPreviewStep || nnPreviewStep : currentStep;
   const liveCode = samples.js || samples[languageOptions[0]] || 'No code example available.';
-  const implementationCode = isVectorSearch && vectorCodeMode === 'real'
-    ? realVectorSearchCode
-    : samples[language] || samples[languageOptions[0]] || 'No code example available.';
+  const implementationCode = samples[language] || samples[languageOptions[0]] || 'No code example available.';
   const activeCodeLines = currentStep?.codeLines || [];
   const activeCodeTone = Number.isInteger(currentStep?.found) ? 'found' : 'active';
   const roundLabel = currentStep ? `${currentStep.round} / ${currentStep.totalRounds}` : `0 / ${steps.length}`;
@@ -88,13 +78,17 @@ export function AlgorithmPage() {
   }, [isPlaying, stepIndex, steps.length]);
 
   useEffect(() => {
-    if (!isTextMachineLearning) return;
-    setInput(isKnn ? defaultKnnInput : defaultVectorInput);
-    setTarget(isKnn ? defaultKnnTarget : defaultVectorTarget);
+    const nextDemo = getAlgorithmDemo(algorithm, fallbackDemo);
+    setInput(nextDemo.input);
+    setTarget(nextDemo.target);
     setSteps([]);
     setStepIndex(0);
     setIsPlaying(false);
-  }, [isKnn, isTextMachineLearning]);
+  }, [algorithm, fallbackDemo]);
+
+  if (slug === 'vector-search') {
+    return <Navigate to="/vector-search" replace />;
+  }
 
   const run = () => {
     if (isPlaying) {
@@ -223,39 +217,15 @@ export function AlgorithmPage() {
       <section className="panel code-panel">
         <div className="panel-title">
           <h2><Code2 size={20} />Implementation examples</h2>
-          {isVectorSearch ? (
-            <div className="code-mode-toggle" aria-label="Vector search code mode">
-              <button className={vectorCodeMode === 'demo' ? 'selected' : ''} onClick={() => setVectorCodeMode('demo')}>Demo</button>
-              <button className={vectorCodeMode === 'real' ? 'selected' : ''} onClick={() => setVectorCodeMode('real')}>Real NN</button>
-            </div>
-          ) : (
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-              {languageOptions.map((option) => (
-                <option key={option} value={option}>{languageLabels[option] || option}</option>
-              ))}
-            </select>
-          )}
+          <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+            {languageOptions.map((option) => (
+              <option key={option} value={option}>{languageLabels[option] || option}</option>
+            ))}
+          </select>
         </div>
-        {isVectorSearch && <VectorSearchDifference mode={vectorCodeMode} />}
         <CodeBlock code={implementationCode}/>
       </section>
     </section>
-  );
-}
-
-function VectorSearchDifference({ mode }) {
-  if (mode === 'real') {
-    return (
-      <div className="vector-note">
-        Real vector search uses an embedding model, often a neural network, to create high-dimensional vectors. A nearest-neighbor index then finds the closest stored vectors without manually written keyword groups.
-      </div>
-    );
-  }
-
-  return (
-    <div className="vector-note">
-      This demo uses a small signed 8D keyword vector and cosine similarity so the animation is readable. Real vector search replaces those rules with learned embeddings and nearest-neighbor search over many dimensions.
-    </div>
   );
 }
 
@@ -279,6 +249,36 @@ function CodeBlock({ code, activeLines, activeTone = 'active', compact = false }
   );
 }
 
+function getAlgorithmDemo(algorithm, fallbackDemo) {
+  return {
+    input: algorithm.demo?.input || fallbackDemo.input,
+    target: algorithm.demo?.target || fallbackDemo.target
+  };
+}
+
+function getFallbackDemo(algorithm) {
+  if (algorithm.slug === 'knn') {
+    return { input: '1, 2, 7, 8', target: '6' };
+  }
+
+  if (isNearestNeighborAlgorithm(algorithm.slug)) {
+    return {
+      input: 'king, queen, teacher, student, love, happy, elephant, tiger, dog, cat, apple, bread, car, train, airplane, school, forest, library, learn, science',
+      target: 'the king loves the elephant in the forest'
+    };
+  }
+
+  if (algorithm.category === 'graph') {
+    return { input: '', target: 'A' };
+  }
+
+  return { input: '14, 7, 29, 3, 18, 41, 10, 24', target: 18 };
+}
+
+function isNearestNeighborAlgorithm(slug) {
+  return ['ann', 'hnsw', 'kd-tree', 'brute-force-search'].includes(slug);
+}
+
 const languageLabels = {
   js: 'JavaScript',
   python: 'Python',
@@ -288,7 +288,7 @@ const languageLabels = {
 };
 
 function getWorstCaseScenario(algorithm, values) {
-  const fallbackValues = values.length ? [...values] : initialValues;
+  const fallbackValues = values.length ? [...values] : parseValues(getFallbackDemo(algorithm).input);
   const sortedValues = [...fallbackValues].sort((a, b) => a - b);
   const missingAfterMax = Math.max(...sortedValues, 0) + 1;
 

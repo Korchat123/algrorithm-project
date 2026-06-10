@@ -1,10 +1,55 @@
 import { Brain, ChevronDown, LogOut, User } from 'lucide-react';
-import { Link, NavLink } from 'react-router-dom';
-import { algorithms } from '../assets/algorithms.js';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth.js';
+import { fallbackAlgorithms, fetchAlgorithms } from '../utils/algorithmData.js';
 
 export function Navbar() {
   const { auth, logout } = useAuth();
+  const [algorithms, setAlgorithms] = useState(fallbackAlgorithms);
+  const [algorithmMenuOpen, setAlgorithmMenuOpen] = useState(false);
+  const algorithmMenuRef = useRef(null);
+  const location = useLocation();
+  const algorithmActive = location.pathname.startsWith('/algorithms');
+
+  useEffect(() => {
+    let active = true;
+    fetchAlgorithms()
+      .then((items) => {
+        if (active) setAlgorithms(items);
+      })
+      .catch(() => {
+        if (active) setAlgorithms(fallbackAlgorithms);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setAlgorithmMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!algorithmMenuRef.current?.contains(event.target)) {
+        setAlgorithmMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setAlgorithmMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   return (
     <header className="topbar">
@@ -15,11 +60,22 @@ export function Navbar() {
       <nav>
         <NavLink to="/">Home</NavLink>
         <NavLink to="/time-complexity">Time Complexity</NavLink>
-        <div className="nav-dropdown">
-          <NavLink to="/algorithms" className="nav-dropdown-trigger">
+        <div
+          className={`nav-dropdown ${algorithmMenuOpen ? 'open' : ''}`}
+          ref={algorithmMenuRef}
+          onMouseEnter={() => setAlgorithmMenuOpen(true)}
+          onMouseLeave={() => setAlgorithmMenuOpen(false)}
+        >
+          <button
+            className={`nav-dropdown-trigger ${algorithmActive ? 'active' : ''}`}
+            type="button"
+            aria-expanded={algorithmMenuOpen}
+            onClick={() => setAlgorithmMenuOpen((open) => !open)}
+          >
             Algorithm <ChevronDown size={15} />
-          </NavLink>
+          </button>
           <div className="nav-dropdown-menu">
+            <NavLink to="/algorithms">All algorithms</NavLink>
             {algorithms.map((algorithm) => (
               <NavLink key={algorithm.slug} to={`/algorithms/${algorithm.slug}`}>
                 {algorithm.name}
@@ -27,17 +83,26 @@ export function Navbar() {
             ))}
           </div>
         </div>
+        <NavLink to="/vector-search">Vector Search</NavLink>
+        <NavLink to="/semantic-search">Semantic Search</NavLink>
         <NavLink to="/games">Games</NavLink>
+        <NavLink to="/leaderboard">Leaderboard</NavLink>
       </nav>
       <div className="auth-actions">
         {auth ? (
           <>
-            <span className="user-chip"><User size={16} />{auth.user.name}</span>
+            <Link to="/profile" className="user-chip"><User size={16} />{auth.user.name}</Link>
+            {auth.user.role === 'admin' && <Link to="/admin" className="nav-link">Admin</Link>}
             <button className="icon-button" onClick={logout} title="Log out">
               <LogOut size={18} />
             </button>
           </>
-        ) : null}
+        ) : (
+          <>
+            <Link to="/auth" className="nav-link">Log in</Link>
+            <Link to="/auth?mode=register" className="nav-register-button">Register</Link>
+          </>
+        )}
       </div>
     </header>
   );

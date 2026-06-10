@@ -8,8 +8,6 @@ const graph = {
   G: []
 };
 
-export const initialValues = [14, 7, 29, 3, 18, 41, 10, 24];
-
 export function parseValues(input) {
   return input
     .split(',')
@@ -37,7 +35,8 @@ export function buildSteps(algorithm, values, target) {
 
   if (algorithm.category === 'machine-learning') {
     if (algorithm.slug === 'knn') return withRoundCounts(knnSteps(values, target));
-    if (algorithm.slug === 'vector-search') return withRoundCounts(vectorSearchSteps(values, target));
+    if (isNearestNeighborSearch(algorithm.slug)) return withRoundCounts(nearestNeighborSteps(algorithm.slug, values, target));
+    if (algorithm.slug === 'vector-search') return withRoundCounts(vectorSearchSteps(values, target, algorithm.vectorSearchMode));
 
     return withRoundCounts([
       { message: 'Convert every item into a vector.' },
@@ -80,17 +79,92 @@ export function buildKnnPreview(input, target) {
   };
 }
 
-export function buildVectorPreview(input, target) {
+export function buildVectorPreview(input, target, mode = 'top-k') {
   const items = parseVectorItems(input);
   const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
+  const modeConfig = nearestNeighborModeConfig(mode);
 
   return {
     points: items,
     query,
-    compareTo: items.map((item) => item.id),
-    phase: 'Vector comparison',
-    detail: 'Enter a text query, then press Play to compare similarity against every item.'
+    compareTo: modeConfig.compareCandidates ? modeConfig.compareCandidates(items, query).map((item) => item.id) : items.map((item) => item.id),
+    searchMode: modeConfig.id,
+    radius: modeConfig.radius,
+    phase: modeConfig.previewPhase,
+    detail: modeConfig.previewDetail,
+    modeLabel: modeConfig.modeLabel
   };
+}
+
+function nearestNeighborModeConfig(mode) {
+  if (mode === 'ann') {
+    return {
+      id: 'ann',
+      radius: null,
+      modeLabel: 'ANN',
+      previewPhase: 'Approximate nearest neighbor',
+      previewDetail: 'ANN narrows to likely candidates first, then ranks only those vectors.',
+      compareCandidates: (items, query) => previewCandidateVectorItems(items, query)
+    };
+  }
+
+  if (mode === 'hnsw') {
+    return {
+      id: 'hnsw',
+      radius: null,
+      modeLabel: 'HNSW',
+      previewPhase: 'Layered graph walk',
+      previewDetail: 'HNSW jumps through graph layers, then refines the answer in the lower layers.',
+      compareCandidates: (items, query) => previewCandidateVectorItems(items, query)
+    };
+  }
+
+  if (mode === 'kd-tree') {
+    return {
+      id: 'kd-tree',
+      radius: null,
+      modeLabel: 'K-d Tree',
+      previewPhase: 'Axis split search',
+      previewDetail: 'A k-d tree splits by axes and checks the most promising side first.',
+      compareCandidates: (items) => items
+    };
+  }
+
+  if (mode === 'brute-force-search') {
+    return {
+      id: 'brute-force-search',
+      radius: null,
+      modeLabel: 'Brute force',
+      previewPhase: 'Full scan',
+      previewDetail: 'Brute force compares the query to every stored vector.',
+      compareCandidates: (items) => items
+    };
+  }
+
+  return {
+    id: 'top-k',
+    radius: null,
+    modeLabel: 'Top K',
+    previewPhase: 'Top-k search',
+    previewDetail: 'Top-k search ranks every vector and returns a fixed number of closest matches.',
+    compareCandidates: (items) => items
+  };
+}
+
+function previewCandidateVectorItems(items, query) {
+  const candidates = items.filter((item) => (
+    item.label === query.label ||
+    cosineSimilarity(item.vector, query.vector) > 0.25
+  ));
+
+  return (candidates.length ? candidates : items)
+    .slice()
+    .sort((a, b) => cosineSimilarity(b.vector, query.vector) - cosineSimilarity(a.vector, query.vector))
+    .slice(0, Math.min(8, items.length));
+}
+
+function isNearestNeighborSearch(slug) {
+  return ['ann', 'hnsw', 'kd-tree', 'brute-force-search'].includes(slug);
 }
 
 function withRoundCounts(steps) {
@@ -1042,19 +1116,26 @@ function knnSteps(input, target) {
   ];
 }
 
-function vectorSearchSteps(input, target) {
+function vectorSearchSteps(input, target, mode = 'top-k') {
   const items = parseVectorItems(input);
   const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
   const queryTokens = tokenizeText(query.raw);
+  const modeConfig = vectorSearchModeConfig(mode);
+  const comparedItems = modeConfig.id === 'ann' ? candidateVectorItems(items, query) : items;
   const ranked = items
     .map((item) => ({
       ...item,
-      similarity: cosineSimilarity(item.vector, query.vector)
+      similarity: cosineSimilarity(item.vector, query.vector),
+      matchReason: explainVectorMatch(item, query)
     }))
     .sort((a, b) => b.similarity - a.similarity);
-  const positiveMatches = ranked.filter((item) => item.similarity > 0);
-  const topMatches = positiveMatches.slice(0, Math.min(3, positiveMatches.length));
-  const base = { points: items, query, nearest: [] };
+  const comparedIds = new Set(comparedItems.map((item) => item.id));
+  const comparedRanked = ranked.filter((item) => comparedIds.has(item.id));
+  const positiveMatches = comparedRanked.filter((item) => item.similarity > 0);
+  const topMatches = modeConfig.id === 'radius'
+    ? comparedRanked.filter((item) => item.similarity >= modeConfig.radius)
+    : positiveMatches.slice(0, Math.min(3, positiveMatches.length));
+  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, radius: modeConfig.radius };
 
   if (!items.length) {
     return [{ message: 'Add text items first so vector search can map them.' }];
@@ -1065,39 +1146,152 @@ function vectorSearchSteps(input, target) {
       ...base,
       phase: 'Embed text',
       codeLines: [2, 3],
-      message: 'Convert each item and the query into vectors.',
-      detail: `First split the query into words: ${queryTokens.join(', ')}. Then vector search builds an 8D vector [self, people, emotion, pet, food, vehicle, place, learning] and scores matches with cosine similarity only.`
+      message: 'Convert each stored word and the query sentence into vectors.',
+      detail: `The word index stores single words. The query sentence splits into: ${queryTokens.join(', ')}. Each word and the full query are mapped into 8 dimensions: [self, people, emotion, animal, food, vehicle, place, learning]. ${modeConfig.embedDetail}`
     },
-    ...ranked.map((item, index) => ({
+    ...comparedRanked.map((item, index) => ({
       ...base,
       activePoint: item.id,
-      measured: ranked.slice(0, index + 1).map((entry) => entry.id),
-      phase: `Similarity ${index + 1}`,
+      compareTo: comparedRanked.map((entry) => entry.id),
+      measured: comparedRanked.slice(0, index + 1).map((entry) => entry.id),
+      phase: `${modeConfig.compareLabel} ${index + 1}`,
       codeLines: [5, 7],
       message: `Compare query to ${item.raw}.`,
-      detail: `"${item.raw}" has cosine similarity ${item.similarity.toFixed(2)} with the query. The range is -1 opposite, 0 unrelated, and 1 same direction.`
+      detail: `"${item.raw}" matches by ${item.matchReason}. Cosine similarity is ${item.similarity.toFixed(2)}. The range is -1 opposite, 0 unrelated, and 1 same direction.`
     })),
     {
       ...base,
-      measured: ranked.map((item) => item.id),
+      compareTo: comparedRanked.map((entry) => entry.id),
+      measured: comparedRanked.map((item) => item.id),
       nearest: topMatches.map((item) => item.id),
       prediction: topMatches.map((item) => item.raw).join(', '),
-      phase: 'Rank matches',
+      phase: modeConfig.resultPhase,
       codeLines: [10],
-      message: 'Return the most similar items.',
+      message: modeConfig.resultMessage,
       detail: topMatches.length
-        ? `The closest vector matches are ${topMatches.map((item) => item.raw).join(', ')}.`
-        : 'No sample word has a positive similarity score for this query.'
+        ? modeConfig.resultDetail(topMatches)
+        : modeConfig.emptyDetail
     }
   ];
 }
 
+function nearestNeighborSteps(mode, input, target) {
+  const items = parseVectorItems(input);
+  const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
+  const modeConfig = nearestNeighborModeConfig(mode);
+  const comparedItems = modeConfig.compareCandidates(items, query);
+  const ranked = comparedItems
+    .map((item) => ({
+      ...item,
+      similarity: cosineSimilarity(item.vector, query.vector),
+      matchReason: explainVectorMatch(item, query)
+    }))
+    .sort((a, b) => b.similarity - a.similarity);
+  const nearest = ranked.slice(0, Math.min(3, ranked.length));
+  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, modeLabel: modeConfig.modeLabel };
+
+  if (!items.length) {
+    return [{ message: 'Add text items first so nearest-neighbor search can map them.' }];
+  }
+
+  return [
+    {
+      ...base,
+      phase: 'Build index',
+      codeLines: [2, 3],
+      message: `Prepare ${modeConfig.modeLabel} data.`,
+      detail: modeConfig.previewDetail
+    },
+    ...ranked.map((item, index) => ({
+      ...base,
+      activePoint: item.id,
+      compareTo: ranked.map((entry) => entry.id),
+      measured: ranked.slice(0, index + 1).map((entry) => entry.id),
+      phase: `${modeConfig.modeLabel} compare ${index + 1}`,
+      codeLines: [5, 7],
+      message: `Compare query to ${item.raw}.`,
+      detail: `"${item.raw}" matches by ${item.matchReason}. Cosine similarity is ${item.similarity.toFixed(2)}.`
+    })),
+    {
+      ...base,
+      compareTo: ranked.map((entry) => entry.id),
+      measured: ranked.map((item) => item.id),
+      nearest: nearest.map((item) => item.id),
+      prediction: nearest.map((item) => item.raw).join(', '),
+      phase: `${modeConfig.modeLabel} result`,
+      codeLines: [10],
+      message: `Return the nearest neighbors with ${modeConfig.modeLabel}.`,
+      detail: `The closest matches are ${nearest.map((item) => `${item.raw} (${item.label})`).join(', ')}.`
+    }
+  ];
+}
+
+function vectorSearchModeConfig(mode) {
+  if (mode === 'radius') {
+    return {
+      id: 'radius',
+      radius: 0.45,
+      previewPhase: 'Radius search',
+      previewDetail: 'Radius search returns every vector inside a similarity threshold, so the result count can grow or shrink.',
+      embedDetail: 'Radius mode will keep every item whose cosine similarity is at least 0.45.',
+      compareLabel: 'Radius check',
+      resultPhase: 'Filter by radius',
+      resultMessage: 'Return all items inside the radius.',
+      resultDetail: (matches) => `These items are inside the similarity radius: ${matches.map((item) => `${item.raw} (${item.similarity.toFixed(2)})`).join(', ')}.`,
+      emptyDetail: 'No item reached the 0.45 similarity radius.'
+    };
+  }
+
+  if (mode === 'ann') {
+    return {
+      id: 'ann',
+      radius: null,
+      previewPhase: 'Approximate search',
+      previewDetail: 'Approximate search compares only likely candidate vectors first, trading perfect recall for speed.',
+      embedDetail: 'Approximate mode first narrows the search to candidate vectors with a related dominant dimension.',
+      compareLabel: 'Candidate',
+      resultPhase: 'Rank candidates',
+      resultMessage: 'Return the best candidate matches.',
+      resultDetail: (matches) => `The approximate candidate scan returns ${matches.map((item) => `${item.raw} (${item.label})`).join(', ')}. It is faster because it skipped unrelated clusters.`,
+      emptyDetail: 'The approximate candidate set did not contain a positive match.'
+    };
+  }
+
+  return {
+    id: 'top-k',
+    radius: null,
+    previewPhase: 'Top-k search',
+    previewDetail: 'Top-k search ranks every vector and returns a fixed number of closest matches.',
+    embedDetail: 'Top-k mode will compare every stored vector and keep the three highest scores.',
+    compareLabel: 'Similarity',
+    resultPhase: 'Rank top 3',
+    resultMessage: 'Return the three most similar items.',
+    resultDetail: (matches) => `The closest meaning/word matches are ${matches.map((item) => `${item.raw} (${item.label})`).join(', ')}.`,
+    emptyDetail: 'No sample word has a positive similarity score for this query.'
+  };
+}
+
+function candidateVectorItems(items, query) {
+  const sameLabel = items.filter((item) => item.label === query.label);
+  const broadCandidates = items.filter((item) => (
+    item.label === query.label ||
+    cosineSimilarity(item.vector, query.vector) > 0.25
+  ));
+  const candidates = broadCandidates.length >= 3 ? broadCandidates : sameLabel;
+
+  return (candidates.length ? candidates : items)
+    .slice()
+    .sort((a, b) => cosineSimilarity(b.vector, query.vector) - cosineSimilarity(a.vector, query.vector))
+    .slice(0, Math.min(8, items.length));
+}
+
 function parseVectorItems(input) {
   const rawItems = Array.isArray(input)
-    ? input.map((item) => String(item))
-    : String(input || '').split(',').map((item) => item.trim()).filter(Boolean);
+    ? input.flatMap((item) => tokenizeText(item))
+    : String(input || '').split(',').flatMap((item) => tokenizeText(item));
+  const uniqueWords = [...new Set(rawItems)];
 
-  return rawItems.map((raw, index) => buildVectorPoint(raw, false, index));
+  return uniqueWords.map((raw, index) => buildVectorPoint(raw, false, index));
 }
 
 function buildVectorPoint(raw, isQuery = false, index = 0) {
@@ -1195,23 +1389,47 @@ function hashText(text) {
 }
 
 const semanticConcepts = {
-  self: { positive: ['i', 'me', 'my', 'mine'], negative: [] },
-  people: { positive: ['you', 'we', 'they', 'person', 'people', 'teacher', 'student'], negative: [] },
-  emotion: { positive: ['love', 'like', 'happy', 'cute'], negative: ['hate', 'sad'] },
-  pet: { positive: ['dog', 'dogs', 'cat', 'cats', 'pet', 'pets', 'animal'], negative: [] },
-  food: { positive: ['apple', 'banana', 'fruit', 'eat', 'eating', 'food', 'hungry', 'have'], negative: [] },
-  vehicle: { positive: ['car', 'drive', 'driving', 'airplane', 'plane', 'fly', 'bicycle', 'bike', 'travel'], negative: [] },
-  place: { positive: ['museum', 'school', 'home', 'park', 'visit', 'class', 'library', 'airport'], negative: [] },
-  learning: { positive: ['school', 'teacher', 'student', 'study', 'class', 'library', 'learn'], negative: [] }
+  self: {
+    positive: ['i', 'me', 'my', 'mine', 'myself', 'this', 'that', 'here', 'there'],
+    negative: []
+  },
+  people: {
+    positive: ['you', 'we', 'they', 'them', 'he', 'she', 'person', 'people', 'man', 'woman', 'child', 'friend', 'family', 'teacher', 'student', 'doctor', 'artist', 'king', 'queen', 'prince', 'princess', 'leader', 'team', 'human'],
+    negative: []
+  },
+  emotion: {
+    positive: ['love', 'like', 'happy', 'joy', 'kind', 'cute', 'smile', 'calm', 'brave', 'hope'],
+    negative: ['hate', 'sad', 'angry', 'fear', 'cry', 'bad', 'lonely']
+  },
+  animal: {
+    positive: ['animal', 'animals', 'pet', 'pets', 'cat', 'cats', 'dog', 'dogs', 'wolf', 'wolves', 'lion', 'tiger', 'elephant', 'horse', 'bird', 'fish', 'bear', 'zebra', 'monkey', 'rabbit', 'cow', 'sheep'],
+    negative: []
+  },
+  food: {
+    positive: ['apple', 'banana', 'orange', 'rice', 'bread', 'milk', 'water', 'fruit', 'meal', 'hungry', 'cook', 'eat', 'eating', 'food', 'tea', 'coffee', 'cake', 'meat', 'fish', 'vegetable', 'soup'],
+    negative: []
+  },
+  vehicle: {
+    positive: ['car', 'bus', 'train', 'airplane', 'plane', 'boat', 'ship', 'bicycle', 'bike', 'truck', 'drive', 'driving', 'fly', 'travel', 'ride', 'road', 'traffic', 'motorcycle', 'helicopter'],
+    negative: []
+  },
+  place: {
+    positive: ['home', 'house', 'school', 'museum', 'park', 'city', 'forest', 'zoo', 'library', 'airport', 'market', 'beach', 'river', 'mountain', 'room', 'street', 'garden', 'class', 'there', 'here', 'visit'],
+    negative: []
+  },
+  learning: {
+    positive: ['learn', 'study', 'class', 'book', 'code', 'math', 'science', 'lesson', 'homework', 'exam', 'teacher', 'student', 'library', 'school', 'read', 'write', 'computer', 'algorithm', 'data'],
+    negative: []
+  }
 };
 
-const vectorLabels = ['self', 'people', 'emotion', 'pet', 'food', 'vehicle', 'place', 'learning'];
+const vectorLabels = ['self', 'people', 'emotion', 'animal', 'food', 'vehicle', 'place', 'learning'];
 
 const vectorAnchors = {
   self: { x: 44, y: 50 },
   people: { x: 58, y: 50 },
   emotion: { x: 50, y: 24 },
-  pet: { x: 78, y: 24 },
+  animal: { x: 78, y: 24 },
   food: { x: 20, y: 24 },
   vehicle: { x: 22, y: 76 },
   place: { x: 78, y: 76 },
@@ -1240,6 +1458,19 @@ function semanticVector(text) {
   });
   const hasSignal = scores.some((score) => score !== 0);
   return hasSignal ? scores : vectorLabels.map(() => 0.1);
+}
+
+function explainVectorMatch(item, query) {
+  const dimensions = item.vector
+    .map((value, index) => ({ label: vectorLabels[index], value, queryValue: query.vector[index] || 0 }))
+    .filter((entry) => entry.value !== 0 && entry.queryValue !== 0)
+    .sort((a, b) => Math.abs(b.value * b.queryValue) - Math.abs(a.value * a.queryValue));
+
+  if (dimensions.length) {
+    return dimensions.slice(0, 2).map((entry) => entry.label).join(' + ');
+  }
+
+  return item.label === 'general' ? 'general word shape' : item.label;
 }
 
 function tokenizeText(text) {

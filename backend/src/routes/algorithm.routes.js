@@ -6,7 +6,7 @@ const router = Router();
 
 router.get('/', async (_req, res, next) => {
   try {
-    const saved = await Algorithm.find().sort({ category: 1, name: 1 });
+    const saved = await Algorithm.find({ slug: { $ne: 'vector-search' } }).sort({ category: 1, name: 1 });
     res.json(saved.length ? saved : algorithms);
   } catch (error) {
     next(error);
@@ -15,6 +15,9 @@ router.get('/', async (_req, res, next) => {
 
 router.get('/:slug', async (req, res, next) => {
   try {
+    if (req.params.slug === 'vector-search') {
+      return res.status(404).json({ message: 'Algorithm not found' });
+    }
     const saved = await Algorithm.findOne({ slug: req.params.slug });
     const fallback = algorithms.find((item) => item.slug === req.params.slug);
     const algorithm = saved || fallback;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export function Visualizer({ algorithm, values, step, target }) {
   if (algorithm.category === 'graph') {
@@ -357,40 +357,142 @@ function GraphVisualizer({ algorithm, step }) {
   );
 }
 
+const emptyVectorPoints = [];
+
 function VectorVisualizer({ step }) {
-  const points = step?.points || [];
+  const points = step?.points || emptyVectorPoints;
   const query = step?.query;
   const measured = new Set(step?.measured || []);
   const nearest = new Set(step?.nearest || []);
   const compareTo = new Set(step?.compareTo || []);
+  const dragRef = useRef(null);
+  const [view, setView] = useState({
+    yaw: -32,
+    pitch: 18,
+    roll: 0,
+    zoom: 1,
+    panX: 0,
+    panY: 0
+  });
+  const scene = useMemo(() => {
+    const items = [
+      ...points.map((point) => ({ ...point, kind: 'point' })),
+      ...(query ? [{ ...query, kind: 'query' }] : [])
+    ];
+    return projectVectorScene(items, view);
+  }, [points, query, view]);
+  const projectedPoints = points
+    .map((point) => scene.items.find((item) => item.id === point.id))
+    .filter(Boolean);
+  const projectedQuery = query ? scene.items.find((item) => item.id === query.id) : null;
+
+  function handlePointerDown(event) {
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      mode: event.shiftKey ? 'pan' : 'rotate'
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event) {
+    if (!dragRef.current) return;
+    const dx = event.clientX - dragRef.current.x;
+    const dy = event.clientY - dragRef.current.y;
+    dragRef.current.x = event.clientX;
+    dragRef.current.y = event.clientY;
+
+    setView((current) => {
+      if (dragRef.current.mode === 'pan') {
+        return {
+          ...current,
+          panX: current.panX + dx * 0.12,
+          panY: current.panY + dy * 0.12
+        };
+      }
+
+      return {
+        ...current,
+        yaw: current.yaw + dx * 0.45,
+        pitch: Math.max(-80, Math.min(80, current.pitch - dy * 0.35))
+      };
+    });
+  }
+
+  function handlePointerUp(event) {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  function handleWheel(event) {
+    event.preventDefault();
+    setView((current) => ({
+      ...current,
+      zoom: Math.max(0.55, Math.min(2.25, current.zoom - event.deltaY * 0.0012))
+    }));
+  }
 
   return (
     <div className="knn-stage vector-search-stage">
-      <div className="knn-map">
-        <span className="axis-label x-axis">vector feature 1</span>
-        <span className="axis-label y-axis">vector feature 2</span>
-        <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          {query && points.map((point) => {
+      <div className="vector-space-toolbar">
+        <span>8D projection</span>
+        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.min(2.25, current.zoom + 0.15) }))}>Zoom in</button>
+        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.max(0.55, current.zoom - 0.15) }))}>Zoom out</button>
+        <button type="button" onClick={() => setView({ yaw: -32, pitch: 18, roll: 0, zoom: 1, panX: 0, panY: 0 })}>Reset</button>
+      </div>
+      <div
+        className="vector-space-map"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+      >
+        <svg className="vector-space-lines" viewBox="0 0 100 100" aria-hidden="true">
+          {projectedQuery && step?.searchMode === 'radius' && (
+            <circle
+              className="vector-radius-ring"
+              cx={projectedQuery.x}
+              cy={projectedQuery.y}
+              r={18 + Number(step.radius || 0) * 18}
+            />
+          )}
+          {scene.axes.map((axis) => (
+            <g className={`vector-axis vector-axis-${axis.index + 1}`} key={axis.label}>
+              <line x1={axis.from.x} x2={axis.to.x} y1={axis.from.y} y2={axis.to.y} />
+              <text x={axis.to.x} y={axis.to.y}>{axis.label}</text>
+            </g>
+          ))}
+          {scene.shells.map((shell) => (
+            <polyline className={`vector-shell ${shell.tone}`} key={shell.id} points={shell.points.map((point) => `${point.x},${point.y}`).join(' ')} />
+          ))}
+          {projectedQuery && points.map((point) => {
+            const projectedPoint = scene.items.find((item) => item.id === point.id);
             const isMeasured = measured.has(point.id);
             const isNearest = nearest.has(point.id);
             const isActive = step?.activePoint === point.id;
             const isCompared = compareTo.has(point.id);
-            if (!isMeasured && !isNearest && !isActive && !isCompared) return null;
+            if (!projectedPoint || (!isMeasured && !isNearest && !isActive && !isCompared)) return null;
             return (
               <line
                 className={`knn-line ${isCompared ? 'compared' : ''} ${isNearest ? 'nearest' : ''} ${isActive ? 'active' : ''}`}
                 key={point.id}
-                x1={query.x}
-                x2={point.x}
-                y1={query.y}
-                y2={point.y}
+                x1={projectedQuery.x}
+                x2={projectedPoint.x}
+                y1={projectedQuery.y}
+                y2={projectedPoint.y}
               />
             );
           })}
         </svg>
-        {points.map((point) => (
+        <div className="vector-space-help">
+          Drag to rotate. Shift-drag to pan. Wheel to zoom.
+        </div>
+        {projectedPoints
+          .sort((a, b) => a.depth - b.depth)
+          .map((point) => (
           <span
-            className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
+            className={`knn-point vector-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
             key={point.id}
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
           >
@@ -398,9 +500,9 @@ function VectorVisualizer({ step }) {
             <small>{point.label}</small>
           </span>
         ))}
-        {query && (
-          <span className="knn-point query" style={{ left: `${query.x}%`, top: `${query.y}%` }}>
-            <strong>{query.raw}</strong>
+        {projectedQuery && (
+          <span className="knn-point query vector-point" style={{ left: `${projectedQuery.x}%`, top: `${projectedQuery.y}%` }}>
+            <strong>{projectedQuery.raw}</strong>
             <small>query</small>
           </span>
         )}
@@ -408,6 +510,9 @@ function VectorVisualizer({ step }) {
       <div className="knn-explanation">
         <strong>{step?.phase || 'Vector map'}</strong>
         <p>{step?.detail || 'Press Play to convert text into vectors and rank the most similar items.'}</p>
+        {step?.modeLabel && <span>Mode: {step.modeLabel}</span>}
+        {step?.searchMode === 'radius' && <span>Radius threshold: cosine &gt;= {Number(step.radius || 0).toFixed(2)}</span>}
+        {step?.searchMode === 'ann' && <span>Approximate mode: only candidate vectors are measured.</span>}
         {step?.prediction && <span>Top matches: {step.prediction}</span>}
       </div>
       <div className="vector-index">
@@ -421,12 +526,132 @@ function VectorVisualizer({ step }) {
   );
 }
 
+const vectorDimensionLabels = [
+  'D1 x/self',
+  'D2 y/people',
+  'D3 z/emotion',
+  'D4 big x/animal',
+  'D5 big y/food',
+  'D6 big z/vehicle',
+  'D7 world x/place',
+  'D8 world y/learning'
+];
+
+function projectVectorScene(items, view) {
+  const origin = projectWorldPoint({ x: 0, y: 0, z: 0 }, view);
+  const axes = vectorDimensionLabels.map((label, index) => {
+    const vector = Array.from({ length: 8 }, (_, dim) => dim === index ? 1 : 0);
+    return {
+      index,
+      label,
+      from: origin,
+      to: projectWorldPoint(vectorToWorld(vector), view)
+    };
+  });
+
+  return {
+    axes,
+    shells: buildVectorShells(view),
+    items: items.map((item) => ({
+      ...item,
+      ...projectWorldPoint(vectorToWorld(item.vector), view)
+    }))
+  };
+}
+
+function vectorToWorld(vector = []) {
+  const values = Array.from({ length: 8 }, (_, index) => Number(vector[index] || 0));
+  return {
+    x: (values[0] * 30) + (values[3] * 46) + (values[6] * 68),
+    y: -(values[1] * 30) - (values[4] * 46) - (values[7] * 68),
+    z: (values[2] * 30) + (values[5] * 46)
+  };
+}
+
+function projectWorldPoint(point, view) {
+  const yaw = toRadians(view.yaw);
+  const pitch = toRadians(view.pitch);
+  const roll = toRadians(view.roll);
+
+  let x = point.x;
+  let y = point.y;
+  let z = point.z;
+
+  const yawX = (x * Math.cos(yaw)) - (z * Math.sin(yaw));
+  const yawZ = (x * Math.sin(yaw)) + (z * Math.cos(yaw));
+  x = yawX;
+  z = yawZ;
+
+  const pitchY = (y * Math.cos(pitch)) - (z * Math.sin(pitch));
+  const pitchZ = (y * Math.sin(pitch)) + (z * Math.cos(pitch));
+  y = pitchY;
+  z = pitchZ;
+
+  const rollX = (x * Math.cos(roll)) - (y * Math.sin(roll));
+  const rollY = (x * Math.sin(roll)) + (y * Math.cos(roll));
+  x = rollX;
+  y = rollY;
+
+  return {
+    x: Math.max(-20, Math.min(120, 50 + view.panX + (x * view.zoom * 0.62))),
+    y: Math.max(-20, Math.min(120, 50 + view.panY + (y * view.zoom * 0.62))),
+    depth: z
+  };
+}
+
+function buildVectorShells(view) {
+  const local = [
+    [0, 0, 0],
+    [30, 0, 0],
+    [30, -30, 0],
+    [0, -30, 0],
+    [0, 0, 0],
+    [0, 0, 30],
+    [30, 0, 30],
+    [30, -30, 30],
+    [0, -30, 30],
+    [0, 0, 30]
+  ];
+  const big = [
+    [0, 0, 0],
+    [46, 0, 0],
+    [46, -46, 0],
+    [0, -46, 0],
+    [0, 0, 0],
+    [0, 0, 46],
+    [46, 0, 46],
+    [46, -46, 46],
+    [0, -46, 46],
+    [0, 0, 46]
+  ];
+  const world = [
+    [0, 0, 0],
+    [68, 0, 0],
+    [68, -68, 0],
+    [0, -68, 0],
+    [0, 0, 0]
+  ];
+
+  return [
+    { id: 'local-shell', tone: 'local', source: local },
+    { id: 'big-shell', tone: 'big', source: big },
+    { id: 'world-shell', tone: 'world', source: world }
+  ].map((shell) => ({
+    ...shell,
+    points: shell.source.map(([x, y, z]) => projectWorldPoint({ x, y, z }, view))
+  }));
+}
+
+function toRadians(degrees) {
+  return (degrees * Math.PI) / 180;
+}
+
 function VectorIndexRow({ item, query, tone }) {
   const similarity = query ? cosineSimilarity(item.vector, query.vector) : null;
 
   return (
     <div className={`vector-index-row ${tone || ''}`}>
-      <span>{item.raw}</span>
+      <span>{item.raw}<small>{item.label}</small></span>
       <code>[{item.vector.map((value) => Number(value.toFixed(2))).join(', ')}]</code>
       {Number.isFinite(similarity) && <em>cos {similarity.toFixed(2)}</em>}
     </div>

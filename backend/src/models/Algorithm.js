@@ -31,6 +31,10 @@ const algorithmSchema = new mongoose.Schema(
       enum: ['search', 'sort', 'graph', 'machine-learning'],
       required: true
     },
+    detail: {
+      type: String,
+      default: ''
+    },
     summary: {
       type: String,
       required: true
@@ -41,7 +45,21 @@ const algorithmSchema = new mongoose.Schema(
       worst: String,
       space: String
     },
-    codeExamples: [codeExampleSchema]
+    codeExamples: [codeExampleSchema],
+    demo: {
+      input: {
+        type: String,
+        default: ''
+      },
+      target: {
+        type: String,
+        default: ''
+      },
+      note: {
+        type: String,
+        default: ''
+      }
+    }
   },
   { timestamps: true }
 );

@@ -27,6 +27,21 @@ const scoreSchema = new mongoose.Schema(
       required: true,
       min: 0
     },
+    level: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 5
+    },
+    mode: {
+      type: String,
+      enum: ['standard', 'time-attack'],
+      default: 'standard'
+    },
+    timeSeconds: {
+      type: Number,
+      min: 0
+    },
     answer: String,
     completedAt: {
       type: Date,
@@ -36,6 +51,6 @@ const scoreSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-scoreSchema.index({ userId: 1, gameId: 1 }, { unique: true });
+scoreSchema.index({ userId: 1, gameId: 1, level: 1, mode: 1 }, { unique: true });
 
 export default mongoose.model('Score', scoreSchema);
