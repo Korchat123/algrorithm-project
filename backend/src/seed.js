@@ -2,8 +2,10 @@ import dotenv from 'dotenv';
 import { connectDb } from './config/db.js';
 import Algorithm from './models/Algorithm.js';
 import Game from './models/Game.js';
+import KnnExample from './models/KnnExample.js';
 import { algorithms } from './data/algorithms.js';
 import { gamesData } from './data/games.js';
+import { knnExamples } from './data/knnExamples.js';
 
 dotenv.config();
 
@@ -13,6 +15,7 @@ async function seed() {
   console.log('Clearing existing data...');
   await Algorithm.deleteMany({});
   await Game.deleteMany({});
+  await KnnExample.deleteMany({});
 
   console.log('Seeding algorithms...');
   const savedAlgorithms = [];
@@ -20,6 +23,9 @@ async function seed() {
     const algo = await Algorithm.create(algoData);
     savedAlgorithms.push(algo);
   }
+
+  console.log('Seeding KNN training examples...');
+  await KnnExample.insertMany(knnExamples);
 
   console.log('Seeding games and levels...');
   for (const gData of gamesData) {
@@ -66,7 +72,7 @@ async function seed() {
     });
   }
 
-  console.log(`Seeded ${savedAlgorithms.length} algorithms and ${await Game.countDocuments()} games/levels.`);
+  console.log(`Seeded ${savedAlgorithms.length} algorithms, ${await KnnExample.countDocuments()} KNN examples, and ${await Game.countDocuments()} games/levels.`);
   process.exit(0);
 }
 

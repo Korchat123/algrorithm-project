@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import Algorithm from '../models/Algorithm.js';
+import KnnExample from '../models/KnnExample.js';
 import { algorithms } from '../data/algorithms.js';
+import { knnExamples } from '../data/knnExamples.js';
 
 const router = Router();
 
@@ -24,6 +26,15 @@ router.get('/:slug', async (req, res, next) => {
 
     if (!algorithm) {
       return res.status(404).json({ message: 'Algorithm not found' });
+    }
+
+    if (req.params.slug === 'knn') {
+      const trainingExamples = await KnnExample.find({}).sort({ category: 1, text: 1 }).lean();
+      const payload = typeof algorithm.toObject === 'function' ? algorithm.toObject() : algorithm;
+      return res.json({
+        ...payload,
+        trainingExamples: trainingExamples.length ? trainingExamples : knnExamples
+      });
     }
 
     res.json(algorithm);
