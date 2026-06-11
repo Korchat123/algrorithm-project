@@ -972,34 +972,72 @@ function KnnVisualizer({ step }) {
   const measured = new Set(step?.measured || []);
   const nearest = new Set(step?.nearest || []);
   const compareTo = new Set(step?.compareTo || []);
-  const scene = buildKnn3dScene(points, query);
+  const dragRef = useRef(null);
+  const [view, setView] = useState({ yaw: -24, pitch: 18, zoom: 1 });
+  const scene = buildKnn3dScene(points, query, view);
   const visibleCategories = scene.categories.filter((category) => (
     category.items.length || category.id === query?.feature || category.id === query?.label
   ));
   const pointById = new Map(scene.points.map((point) => [point.id, point]));
 
+  function handlePointerDown(event) {
+    dragRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event) {
+    if (!dragRef.current) return;
+    const dx = event.clientX - dragRef.current.x;
+    const dy = event.clientY - dragRef.current.y;
+    dragRef.current.x = event.clientX;
+    dragRef.current.y = event.clientY;
+
+    setView((current) => ({
+      ...current,
+      yaw: current.yaw + dx * 0.45,
+      pitch: Math.max(-58, Math.min(58, current.pitch - dy * 0.35))
+    }));
+  }
+
+  function handlePointerUp(event) {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  function handleWheel(event) {
+    event.preventDefault();
+    setView((current) => ({
+      ...current,
+      zoom: Math.max(0.72, Math.min(1.85, current.zoom - event.deltaY * 0.0012))
+    }));
+  }
+
   return (
     <div className="knn-stage">
-      <div className="knn-map knn-3d-map">
-        <span className="axis-label x-axis">feature space</span>
-        <span className="axis-label y-axis">category spheres</span>
-        {visibleCategories.map((category) => (
-          <section
-            className={`knn-category-sphere ${category.id}`}
-            key={category.id}
-            style={{
-              '--sphere-x': `${category.screen.x}%`,
-              '--sphere-y': `${category.screen.y}%`,
-              '--sphere-size': `${category.size}px`,
-              '--sphere-color': category.color,
-              '--sphere-shadow': category.shadow
-            }}
-          >
-            <strong>{category.label}</strong>
-            <span>{category.items.length} samples</span>
-          </section>
-        ))}
+      <div className="vector-space-toolbar knn-toolbar">
+        <span>3D KNN space</span>
+        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.min(1.85, current.zoom + 0.14) }))}>Zoom in</button>
+        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.max(0.72, current.zoom - 0.14) }))}>Zoom out</button>
+        <button type="button" onClick={() => setView({ yaw: -24, pitch: 18, zoom: 1 })}>Reset</button>
+      </div>
+      <div
+        className="knn-map knn-3d-map"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+      >
+        <div className="vector-space-help">Drag to rotate. Wheel to zoom.</div>
         <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          {visibleCategories.flatMap((category) => category.rings.map((ring) => (
+            <polyline
+              className="knn-sphere-ring"
+              key={`${category.id}-${ring.id}`}
+              points={ring.points.map((point) => `${point.x},${point.y}`).join(' ')}
+              style={{ '--sphere-color': category.color }}
+            />
+          )))}
           {query && scene.points.map((point) => {
             const isMeasured = measured.has(point.id);
             const isNearest = nearest.has(point.id);
@@ -1018,7 +1056,21 @@ function KnnVisualizer({ step }) {
             );
           })}
         </svg>
-        {scene.points.map((point) => (
+        {visibleCategories.map((category) => (
+          <div
+            className="knn-category-label"
+            key={category.id}
+            style={{
+              left: `${category.screen.x}%`,
+              top: `${category.screen.y}%`,
+              '--sphere-color': category.color
+            }}
+          >
+            <strong>{category.label}</strong>
+            <span>{category.items.length} samples</span>
+          </div>
+        ))}
+        {scene.points.slice().sort((a, b) => a.depth - b.depth).map((point) => (
           <span
             className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
             key={point.id}
@@ -1064,42 +1116,44 @@ function KnnVisualizer({ step }) {
 }
 
 const knnCategoryStyles = {
-  food: { label: 'Food', x: 20, y: 26, z: -16, color: '#d95d39', shadow: 'rgba(217, 93, 57, 0.22)' },
-  animal: { label: 'Animal', x: 76, y: 24, z: 16, color: '#1f6f58', shadow: 'rgba(31, 111, 88, 0.24)' },
-  vehicle: { label: 'Vehicle', x: 22, y: 76, z: 14, color: '#397b68', shadow: 'rgba(57, 123, 104, 0.24)' },
-  place: { label: 'Place', x: 78, y: 74, z: -10, color: '#b24b34', shadow: 'rgba(178, 75, 52, 0.21)' },
-  person: { label: 'Person', x: 50, y: 49, z: 24, color: '#52615b', shadow: 'rgba(82, 97, 91, 0.24)' },
-  text: { label: 'Unknown', x: 50, y: 50, z: -28, color: '#7d8b84', shadow: 'rgba(82, 97, 91, 0.18)' }
+  food: { label: 'Food', x: -58, y: -30, z: -26, color: '#d95d39' },
+  animal: { label: 'Animal', x: 58, y: -34, z: 22, color: '#1f6f58' },
+  vehicle: { label: 'Vehicle', x: -58, y: 36, z: 22, color: '#397b68' },
+  place: { label: 'Place', x: 58, y: 36, z: -18, color: '#b24b34' },
+  person: { label: 'Person', x: 0, y: 2, z: 34, color: '#52615b' },
+  text: { label: 'Unknown', x: 0, y: 0, z: -42, color: '#7d8b84' }
 };
 
-function buildKnn3dScene(points, query) {
+function buildKnn3dScene(points, query, view) {
   const categories = Object.entries(knnCategoryStyles).map(([id, category]) => ({
     id,
     ...category,
-    screen: projectKnn3dPoint(category),
+    screen: projectKnn3dPoint(category, view),
+    rings: buildKnnSphereRings({ id, ...category }, view),
     items: points.filter((point) => (point.feature || point.label) === id),
-    size: id === 'text' ? 118 : 138
+    radius: id === 'text' ? 22 : 28
   }));
 
   return {
     categories,
-    points: points.map((point, index) => projectKnnItem(point, index)),
-    query: query ? projectKnnItem({ ...query, label: 'target', feature: query.feature || query.label }, 0, true) : null
+    points: points.map((point, index) => projectKnnItem(point, index, view)),
+    query: query ? projectKnnItem({ ...query, label: 'target', feature: query.feature || query.label }, 0, view, true) : null
   };
 }
 
-function projectKnnItem(point, index, isQuery = false) {
-  const category = knnCategoryStyles[point.feature || point.label] || knnCategoryStyles.text;
-  const ring = index % 8;
-  const angle = (ring / 8) * Math.PI * 2;
-  const shell = Math.floor(index / 8);
-  const radius = isQuery ? 0 : 18 + ((shell % 2) * 5);
-  const zOffset = isQuery ? 34 : ((ring % 3) - 1) * 8 + (shell * 2);
+function projectKnnItem(point, index, view, isQuery = false) {
+  const categoryId = point.feature || point.label;
+  const category = { id: categoryId, ...(knnCategoryStyles[categoryId] || knnCategoryStyles.text) };
+  const radius = category.id === 'text' ? 16 : 20;
+  const ring = index % 12;
+  const angle = (ring / 12) * Math.PI * 2;
+  const heightBand = ((Math.floor(index / 12) % 3) - 1) * 7;
+  const localRadius = isQuery ? 0 : Math.max(8, radius - Math.abs(heightBand) * 0.8);
   const projected = projectKnn3dPoint({
-    x: category.x + Math.cos(angle) * radius,
-    y: category.y + Math.sin(angle) * radius * 0.58,
-    z: category.z + zOffset
-  });
+    x: category.x + Math.cos(angle) * localRadius,
+    y: category.y + heightBand,
+    z: category.z + Math.sin(angle) * localRadius
+  }, view);
 
   return {
     ...point,
@@ -1108,10 +1162,41 @@ function projectKnnItem(point, index, isQuery = false) {
   };
 }
 
-function projectKnn3dPoint(point) {
+function buildKnnSphereRings(category, view) {
+  const radius = category.id === 'text' ? 22 : 28;
+  const samples = 56;
+  const ringDefs = [
+    { id: 'xy', point: (angle) => ({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: 0 }) },
+    { id: 'xz', point: (angle) => ({ x: Math.cos(angle) * radius, y: 0, z: Math.sin(angle) * radius }) },
+    { id: 'yz', point: (angle) => ({ x: 0, y: Math.cos(angle) * radius, z: Math.sin(angle) * radius }) }
+  ];
+
+  return ringDefs.map((ring) => ({
+    id: ring.id,
+    points: Array.from({ length: samples + 1 }, (_, index) => {
+      const angle = (index / samples) * Math.PI * 2;
+      const point = ring.point(angle);
+      return projectKnn3dPoint({
+        x: category.x + point.x,
+        y: category.y + point.y,
+        z: category.z + point.z
+      }, view);
+    })
+  }));
+}
+
+function projectKnn3dPoint(point, view) {
+  const yaw = toRadians(view.yaw);
+  const pitch = toRadians(view.pitch);
+  const yawX = (point.x * Math.cos(yaw)) - (point.z * Math.sin(yaw));
+  const yawZ = (point.x * Math.sin(yaw)) + (point.z * Math.cos(yaw));
+  const pitchY = (point.y * Math.cos(pitch)) - (yawZ * Math.sin(pitch));
+  const pitchZ = (point.y * Math.sin(pitch)) + (yawZ * Math.cos(pitch));
+  const zoom = view.zoom;
+
   return {
-    x: Math.max(5, Math.min(95, point.x - point.z * 0.18)),
-    y: Math.max(7, Math.min(93, point.y + point.z * 0.12)),
-    depth: Math.max(-40, Math.min(50, point.z))
+    x: Math.max(-15, Math.min(115, 50 + yawX * 0.42 * zoom)),
+    y: Math.max(-15, Math.min(115, 50 + pitchY * 0.42 * zoom)),
+    depth: Math.max(-90, Math.min(90, pitchZ))
   };
 }
