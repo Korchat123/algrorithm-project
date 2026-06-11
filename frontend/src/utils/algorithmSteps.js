@@ -67,15 +67,14 @@ export function buildSteps(algorithm, values, target, options = {}) {
 
 export function buildKnnPreview(input, target) {
   const items = parseKnnItems(input);
-  const rawItems = items.map((item) => item.raw);
-  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'Target', rawItems, true);
+  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'target', true);
 
   return {
     points: items,
     query,
     compareTo: items.map((item) => item.id),
     phase: 'Target comparison',
-    detail: 'Enter a thing like dog, car, apple, or school. KNN compares it with labeled sample items and predicts its category.'
+    detail: 'Enter a new thing like bird, fox, or drone. The demo first converts it into features, then KNN compares those numbers with labeled examples.'
   };
 }
 
@@ -1067,12 +1066,11 @@ function getNeighborCount(value, itemCount, fallback = 3) {
 
 function knnSteps(input, target, options = {}) {
   const items = parseKnnItems(input);
-  const rawItems = items.map((item) => item.raw);
-  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'Target', rawItems, true);
+  const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'target', true);
   const distances = items
     .map((item) => ({
       ...item,
-      distance: Math.hypot(item.x - query.x, item.y - query.y)
+      distance: featureDistance(item.features, query.features)
     }))
     .sort((a, b) => a.distance - b.distance);
   const k = getNeighborCount(options.k, distances.length);
@@ -1087,10 +1085,10 @@ function knnSteps(input, target, options = {}) {
   return [
     {
       ...base,
-      phase: 'Map data',
+      phase: 'Convert words to features',
       codeLines: [2, 3],
-      message: 'Map labeled sample things into points.',
-      detail: 'KNN starts with known examples from the sample database. Each thing already has a label such as animal, food, vehicle, place, or person.'
+      message: 'Convert each known word into numeric features.',
+      detail: 'The database stores each training word with three feature numbers: size, nature, and human-like. KNN can only measure distance after words become numbers.'
     },
     ...distances.map((item, index) => ({
       ...base,
@@ -1099,7 +1097,7 @@ function knnSteps(input, target, options = {}) {
       phase: `Distance ${index + 1}`,
       codeLines: [5, 7],
       message: `Measure distance from ${query.raw} to ${item.raw}.`,
-      detail: `${item.raw} is labeled "${item.label}" and is ${item.distance.toFixed(1)} map units from ${query.raw}. Smaller distance means more similar.`
+      detail: `${query.raw} features: ${formatFeatures(query.features)}. ${item.raw} features: ${formatFeatures(item.features)}. Distance is ${item.distance.toFixed(2)}, so smaller means more similar.`
     })),
     {
       ...base,
@@ -1108,7 +1106,7 @@ function knnSteps(input, target, options = {}) {
       phase: 'Pick nearest',
       codeLines: [10],
       message: `Choose the ${k} closest point${k === 1 ? '' : 's'}.`,
-      detail: `The nearest examples are ${nearest.map((item) => `${item.raw} (${item.label})`).join(', ')}. KNN only votes with these closest labeled examples.`
+      detail: `The nearest examples are ${nearest.map((item) => `${item.raw} (${item.label}, distance ${item.distance.toFixed(2)})`).join(', ')}. Only these closest labeled examples vote.`
     },
     {
       ...base,
@@ -1118,7 +1116,7 @@ function knnSteps(input, target, options = {}) {
       phase: 'Vote',
       codeLines: [11],
       message: `Predicted category: ${prediction}.`,
-      detail: `The closest examples vote by category, so "${query.raw}" is predicted as "${prediction}".`
+      detail: `The closest examples vote by label, so "${query.raw}" is predicted as "${prediction}". KNN did not understand the word itself; it used the feature numbers.`
     }
   ];
 }
@@ -1328,7 +1326,9 @@ function parseKnnItems(input) {
         ? {
           raw: String(item.text || item.raw || item.label || ''),
           label: item.label || item.category,
-          category: item.category || item.label
+          category: item.category || item.label,
+          features: normalizeKnnFeatures(item.features),
+          explanation: item.explanation || ''
         }
         : { raw: String(item) }
     )).filter((item) => item.raw)
@@ -1338,81 +1338,116 @@ function parseKnnItems(input) {
     ? [...numericValues].sort((a, b) => a - b)[Math.floor(numericValues.length / 2)]
     : 0;
 
-  return rawItems.map((item, index, all) => {
-    const allRawItems = all.map((entry) => entry.raw);
+  return rawItems.map((item, index) => {
     return buildKnnPoint(
       item.raw,
       item.label || getKnnLabel(item.raw, numericMedian),
-      allRawItems,
       false,
       index,
-      item.category
+      item.category,
+      item.features,
+      item.explanation
     );
   });
 }
 
-function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0, knownCategory) {
+function buildKnnPoint(raw, label, isQuery = false, index = 0, knownCategory, knownFeatures, explanation = '') {
   const number = Number(raw);
-  const allNumbers = allItems.map(Number).filter((value) => Number.isFinite(value));
+  const features = knownFeatures || inferKnnFeatures(raw);
+  const category = knownCategory || categoryFromFeatures(features);
 
-  if (Number.isFinite(number) && allNumbers.length) {
-    const min = Math.min(...allNumbers, number);
-    const max = Math.max(...allNumbers, number);
-    const spread = max - min || 1;
-    const normalized = (number - min) / spread;
+  if (Number.isFinite(number)) {
     return {
       id: isQuery ? 'target' : `p-${index}`,
       raw,
       label,
-      x: 12 + normalized * 76,
-      y: 78 - normalized * 52 + (isQuery ? 0 : (index % 3) * 8),
-      feature: `value ${number}`
+      features,
+      x: features.size * 10,
+      y: 100 - features.nature * 10,
+      feature: category,
+      explanation
     };
   }
-
-  const word = raw.toLowerCase();
-  const category = knownCategory || getTextCategory(word);
-  const anchor = categoryAnchors[category] || categoryAnchors.text;
-  const xOffset = ((hashText(word) % 17) - 8) * 0.9;
-  const yOffset = ((hashText([...word].reverse().join('')) % 17) - 8) * 0.9;
 
   return {
     id: isQuery ? 'target' : `p-${index}`,
     raw,
     label,
-    x: Math.max(10, Math.min(90, anchor.x + xOffset)),
-    y: Math.max(12, Math.min(88, anchor.y + yOffset)),
-    feature: category
+    features,
+    x: features.size * 10,
+    y: 100 - features.nature * 10,
+    feature: category,
+    explanation
   };
+}
+
+function normalizeKnnFeatures(features) {
+  if (!features) return null;
+  const normalized = {
+    size: Number(features.size),
+    nature: Number(features.nature),
+    humanLike: Number(features.humanLike)
+  };
+
+  return Object.values(normalized).every((value) => Number.isFinite(value))
+    ? normalized
+    : null;
+}
+
+function inferKnnFeatures(raw) {
+  const word = String(raw || '').toLowerCase().trim();
+  const direct = knnFeatureDictionary[word];
+  if (direct) return direct;
+
+  return { size: 5, nature: 5, humanLike: 5 };
+}
+
+function featureDistance(a, b) {
+  return Math.hypot(
+    Number(a?.size || 0) - Number(b?.size || 0),
+    Number(a?.nature || 0) - Number(b?.nature || 0),
+    Number(a?.humanLike || 0) - Number(b?.humanLike || 0)
+  );
+}
+
+function formatFeatures(features) {
+  return `[size ${features.size}, nature ${features.nature}, human-like ${features.humanLike}]`;
+}
+
+function categoryFromFeatures(features) {
+  if (features.nature >= 7) return 'living';
+  if (features.nature <= 3) return 'man-made';
+  return 'unknown';
 }
 
 function getKnnLabel(raw, numericMedian) {
   const number = Number(raw);
   if (Number.isFinite(number)) return number >= numericMedian ? 'high' : 'low';
-  return getTextCategory(raw.toLowerCase());
+  const category = categoryFromFeatures(inferKnnFeatures(raw));
+  if (category === 'living') return 'living thing';
+  if (category === 'man-made') return 'man-made object';
+  return 'unknown';
 }
 
-const categoryAnchors = {
-  fruit: { x: 20, y: 24 },
-  food: { x: 20, y: 24 },
-  animal: { x: 78, y: 24 },
-  vehicle: { x: 22, y: 76 },
-  place: { x: 78, y: 76 },
-  person: { x: 50, y: 24 },
-  text: { x: 50, y: 50 }
+const knnFeatureDictionary = {
+  cat: { size: 2, nature: 10, humanLike: 1 },
+  dog: { size: 3, nature: 10, humanLike: 1 },
+  lion: { size: 6, nature: 10, humanLike: 1 },
+  fox: { size: 3, nature: 10, humanLike: 1 },
+  wolf: { size: 4, nature: 10, humanLike: 1 },
+  bird: { size: 2, nature: 10, humanLike: 1 },
+  eagle: { size: 3, nature: 10, humanLike: 1 },
+  human: { size: 5, nature: 10, humanLike: 10 },
+  person: { size: 5, nature: 10, humanLike: 10 },
+  king: { size: 5, nature: 9.5, humanLike: 10 },
+  queen: { size: 5, nature: 9.5, humanLike: 10 },
+  museum: { size: 9, nature: 1, humanLike: 2 },
+  school: { size: 8, nature: 1, humanLike: 3 },
+  library: { size: 8, nature: 1, humanLike: 3 },
+  airplane: { size: 10, nature: 1, humanLike: 1 },
+  drone: { size: 2, nature: 1, humanLike: 1 },
+  car: { size: 4, nature: 1, humanLike: 1 }
 };
-
-const textCategories = {
-  food: ['apple', 'banana', 'mango', 'kiwi', 'grape', 'peach', 'pear', 'orange', 'melon', 'berry', 'pizza', 'noodles', 'rice', 'bread', 'cheese', 'salad', 'pasta'],
-  animal: ['tiger', 'dolphin', 'lion', 'cat', 'dog', 'bird', 'horse', 'zebra', 'shark', 'eagle', 'kitten'],
-  vehicle: ['bicycle', 'airplane', 'car', 'bus', 'train', 'truck', 'boat', 'ship', 'motorcycle', 'helicopter'],
-  place: ['school', 'museum', 'park', 'library', 'market', 'airport', 'station', 'city', 'beach', 'zoo'],
-  person: ['teacher', 'student', 'doctor', 'artist', 'friend', 'chef', 'driver', 'child', 'person', 'people']
-};
-
-function getTextCategory(word) {
-  return Object.entries(textCategories).find(([, words]) => words.includes(word))?.[0] || 'text';
-}
 
 function hashText(text) {
   return [...text].reduce((total, char) => total + char.charCodeAt(0), 0);

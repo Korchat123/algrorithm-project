@@ -36,8 +36,8 @@ router.get('/:slug', async (req, res, next) => {
         demo: {
           ...(payload.demo || {}),
           input: payload.demo?.input || fallback?.demo?.input,
-          target: 'dog',
-          note: 'Labeled sample things let KNN classify a target such as dog as animal.'
+          target: 'bird',
+          note: 'Each sample has numeric features. Bird is new data, then KNN uses the nearest feature points to classify it.'
         },
         trainingExamples: trainingExamples.length ? trainingExamples : knnExamples
       });

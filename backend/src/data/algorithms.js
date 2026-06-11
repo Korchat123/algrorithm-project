@@ -371,9 +371,9 @@ export const algorithms = [
     summary: 'Classifies a point by looking at the labels of the closest known points.',
     bigO: { best: 'O(n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' },
     demo: {
-      input: 'apple, banana, mango, orange, tiger, dolphin, eagle, kitten, bicycle, airplane, scooter, train, school, museum, library, airport, teacher, student, pizza, noodles',
-      target: 'dog',
-      note: 'Mixed labeled words from the KNN sample database let the visualizer classify a thing such as dog as animal.'
+      input: 'cat, dog, lion, human, king, queen, museum, airplane',
+      target: 'bird',
+      note: 'Each sample has numeric features. Bird is new data, then KNN uses the nearest feature points to classify it.'
     },
     codeExamples: [
       {

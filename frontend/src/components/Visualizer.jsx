@@ -1116,12 +1116,9 @@ function KnnVisualizer({ step }) {
 }
 
 const knnCategoryStyles = {
-  food: { label: 'Food', x: -58, y: -30, z: -26, color: '#d95d39' },
-  animal: { label: 'Animal', x: 58, y: -34, z: 22, color: '#1f6f58' },
-  vehicle: { label: 'Vehicle', x: -58, y: 36, z: 22, color: '#397b68' },
-  place: { label: 'Place', x: 58, y: 36, z: -18, color: '#b24b34' },
-  person: { label: 'Person', x: 0, y: 2, z: 34, color: '#52615b' },
-  text: { label: 'Unknown', x: 0, y: 0, z: -42, color: '#7d8b84' }
+  living: { label: 'Living', x: -42, y: -16, z: 20, color: '#1f6f58' },
+  'man-made': { label: 'Man-made', x: 46, y: 20, z: -18, color: '#b24b34' },
+  unknown: { label: 'Unknown', x: 0, y: 2, z: -46, color: '#7d8b84' }
 };
 
 function buildKnn3dScene(points, query, view) {

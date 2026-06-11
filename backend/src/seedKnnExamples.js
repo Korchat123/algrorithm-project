@@ -8,13 +8,8 @@ dotenv.config();
 async function seedKnnExamples() {
   await connectDb();
 
-  for (const example of knnExamples) {
-    await KnnExample.updateOne(
-      { text: example.text },
-      { $set: example },
-      { upsert: true }
-    );
-  }
+  await KnnExample.deleteMany({});
+  await KnnExample.insertMany(knnExamples);
 
   console.log(`Seeded ${await KnnExample.countDocuments()} KNN examples.`);
   process.exit(0);

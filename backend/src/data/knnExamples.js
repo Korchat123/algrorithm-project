@@ -1,42 +1,58 @@
 export const knnExamples = [
-  { text: 'apple', label: 'food', category: 'food' },
-  { text: 'banana', label: 'food', category: 'food' },
-  { text: 'mango', label: 'food', category: 'food' },
-  { text: 'orange', label: 'food', category: 'food' },
-  { text: 'pizza', label: 'food', category: 'food' },
-  { text: 'noodles', label: 'food', category: 'food' },
-  { text: 'rice', label: 'food', category: 'food' },
-  { text: 'bread', label: 'food', category: 'food' },
-  { text: 'tiger', label: 'animal', category: 'animal' },
-  { text: 'dolphin', label: 'animal', category: 'animal' },
-  { text: 'eagle', label: 'animal', category: 'animal' },
-  { text: 'kitten', label: 'animal', category: 'animal' },
-  { text: 'lion', label: 'animal', category: 'animal' },
-  { text: 'dog', label: 'animal', category: 'animal' },
-  { text: 'zebra', label: 'animal', category: 'animal' },
-  { text: 'shark', label: 'animal', category: 'animal' },
-  { text: 'bicycle', label: 'vehicle', category: 'vehicle' },
-  { text: 'airplane', label: 'vehicle', category: 'vehicle' },
-  { text: 'scooter', label: 'vehicle', category: 'vehicle' },
-  { text: 'train', label: 'vehicle', category: 'vehicle' },
-  { text: 'car', label: 'vehicle', category: 'vehicle' },
-  { text: 'bus', label: 'vehicle', category: 'vehicle' },
-  { text: 'truck', label: 'vehicle', category: 'vehicle' },
-  { text: 'boat', label: 'vehicle', category: 'vehicle' },
-  { text: 'school', label: 'place', category: 'place' },
-  { text: 'museum', label: 'place', category: 'place' },
-  { text: 'library', label: 'place', category: 'place' },
-  { text: 'airport', label: 'place', category: 'place' },
-  { text: 'zoo', label: 'place', category: 'place' },
-  { text: 'market', label: 'place', category: 'place' },
-  { text: 'beach', label: 'place', category: 'place' },
-  { text: 'park', label: 'place', category: 'place' },
-  { text: 'teacher', label: 'person', category: 'person' },
-  { text: 'student', label: 'person', category: 'person' },
-  { text: 'doctor', label: 'person', category: 'person' },
-  { text: 'artist', label: 'person', category: 'person' },
-  { text: 'friend', label: 'person', category: 'person' },
-  { text: 'chef', label: 'person', category: 'person' },
-  { text: 'driver', label: 'person', category: 'person' },
-  { text: 'child', label: 'person', category: 'person' }
+  {
+    text: 'cat',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 2, nature: 10, humanLike: 1 },
+    explanation: 'Small, fully living, not human-like.'
+  },
+  {
+    text: 'dog',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 3, nature: 10, humanLike: 1 },
+    explanation: 'Small-medium, fully living, not human-like.'
+  },
+  {
+    text: 'lion',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 6, nature: 10, humanLike: 1 },
+    explanation: 'Medium-large, fully living, not human-like.'
+  },
+  {
+    text: 'human',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 5, nature: 10, humanLike: 10 },
+    explanation: 'Medium size, fully living, strongly human-like.'
+  },
+  {
+    text: 'king',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 5, nature: 9.5, humanLike: 10 },
+    explanation: 'A human role, so it stays near human and queen.'
+  },
+  {
+    text: 'queen',
+    label: 'living thing',
+    category: 'living',
+    features: { size: 5, nature: 9.5, humanLike: 10 },
+    explanation: 'A human role, so it stays near human and king.'
+  },
+  {
+    text: 'museum',
+    label: 'man-made object',
+    category: 'man-made',
+    features: { size: 9, nature: 1, humanLike: 2 },
+    explanation: 'Very large and man-made.'
+  },
+  {
+    text: 'airplane',
+    label: 'man-made object',
+    category: 'man-made',
+    features: { size: 10, nature: 1, humanLike: 1 },
+    explanation: 'Extremely large and man-made.'
+  }
 ];

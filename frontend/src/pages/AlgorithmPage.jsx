@@ -281,8 +281,8 @@ function getAlgorithmDemo(algorithm, fallbackDemo) {
 function getFallbackDemo(algorithm) {
   if (algorithm.slug === 'knn') {
     return {
-      input: 'apple, banana, mango, orange, pizza, noodles, tiger, dolphin, eagle, kitten, lion, dog, bicycle, airplane, scooter, train, car, bus, school, museum, library, airport, zoo, market, teacher, student, doctor, artist',
-      target: 'dog'
+      input: 'cat, dog, lion, human, king, queen, museum, airplane',
+      target: 'bird'
     };
   }
 
