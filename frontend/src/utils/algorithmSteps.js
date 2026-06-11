@@ -1070,13 +1070,32 @@ function knnSteps(input, target, options = {}) {
   const distances = items
     .map((item) => ({
       ...item,
-      distance: featureDistance(item.features, query.features)
+      distance: featureDistance(item.features, query.features),
+      distanceParts: featureDistanceParts(item.features, query.features)
     }))
     .sort((a, b) => a.distance - b.distance);
   const k = getNeighborCount(options.k, distances.length);
   const nearest = distances.slice(0, k);
+  const voteCounts = getKnnVoteCounts(nearest);
   const prediction = chooseKnnLabel(nearest);
-  const base = { points: items, query, nearest: [], k };
+  const distanceRows = distances.map((item, index) => ({
+    id: item.id,
+    raw: item.raw,
+    label: item.label,
+    rank: index + 1,
+    distance: item.distance,
+    parts: item.distanceParts,
+    explanation: item.explanation
+  }));
+  const base = {
+    points: items,
+    query,
+    nearest: [],
+    k,
+    distanceRows,
+    voteCounts: [],
+    featureLabels: ['size', 'nature', 'human-like']
+  };
 
   if (!items.length) {
     return [{ message: 'Add numbers or words first so KNN can map them.' }];
@@ -1088,35 +1107,44 @@ function knnSteps(input, target, options = {}) {
       phase: 'Convert words to features',
       codeLines: [2, 3],
       message: 'Convert each known word into numeric features.',
-      detail: 'The database stores each training word with three feature numbers: size, nature, and human-like. KNN can only measure distance after words become numbers.'
+      detail: `The target "${query.raw}" becomes ${formatFeatures(query.features)}. Every known example uses the same three features, so KNN can compare points on the same scale.`
     },
     ...distances.map((item, index) => ({
       ...base,
       activePoint: item.id,
       measured: distances.slice(0, index + 1).map((entry) => entry.id),
+      activeDistance: {
+        id: item.id,
+        raw: item.raw,
+        label: item.label,
+        distance: item.distance,
+        parts: item.distanceParts
+      },
       phase: `Distance ${index + 1}`,
       codeLines: [5, 7],
       message: `Measure distance from ${query.raw} to ${item.raw}.`,
-      detail: `${query.raw} features: ${formatFeatures(query.features)}. ${item.raw} features: ${formatFeatures(item.features)}. Distance is ${item.distance.toFixed(2)}, so smaller means more similar.`
+      detail: `${query.raw} ${formatFeatures(query.features)} vs ${item.raw} ${formatFeatures(item.features)}. Distance = sqrt(${item.distanceParts.map((part) => `${part.diff}^2`).join(' + ')}) = ${item.distance.toFixed(2)}. Smaller distance means more similar.`
     })),
     {
       ...base,
       measured: distances.map((item) => item.id),
       nearest: nearest.map((item) => item.id),
+      voteCounts,
       phase: 'Pick nearest',
       codeLines: [10],
       message: `Choose the ${k} closest point${k === 1 ? '' : 's'}.`,
-      detail: `The nearest examples are ${nearest.map((item) => `${item.raw} (${item.label}, distance ${item.distance.toFixed(2)})`).join(', ')}. Only these closest labeled examples vote.`
+      detail: `After sorting by distance, keep only rank 1 through ${k}: ${nearest.map((item) => `${item.raw} (${item.distance.toFixed(2)})`).join(', ')}. Farther examples are ignored for this prediction.`
     },
     {
       ...base,
       measured: distances.map((item) => item.id),
       nearest: nearest.map((item) => item.id),
+      voteCounts,
       prediction,
       phase: 'Vote',
       codeLines: [11],
       message: `Predicted category: ${prediction}.`,
-      detail: `The closest examples vote by label, so "${query.raw}" is predicted as "${prediction}". KNN did not understand the word itself; it used the feature numbers.`
+      detail: `The kept neighbors vote by label: ${formatVoteCounts(voteCounts)}. The largest vote count wins, so "${query.raw}" is predicted as "${prediction}".`
     }
   ];
 }
@@ -1410,8 +1438,31 @@ function featureDistance(a, b) {
   );
 }
 
+function featureDistanceParts(a, b) {
+  return [
+    { label: 'size', diff: Number((Number(a?.size || 0) - Number(b?.size || 0)).toFixed(2)) },
+    { label: 'nature', diff: Number((Number(a?.nature || 0) - Number(b?.nature || 0)).toFixed(2)) },
+    { label: 'human-like', diff: Number((Number(a?.humanLike || 0) - Number(b?.humanLike || 0)).toFixed(2)) }
+  ];
+}
+
 function formatFeatures(features) {
   return `[size ${features.size}, nature ${features.nature}, human-like ${features.humanLike}]`;
+}
+
+function getKnnVoteCounts(nearest) {
+  const counts = nearest.reduce((acc, item) => {
+    acc[item.label] = (acc[item.label] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+function formatVoteCounts(voteCounts) {
+  return voteCounts.map((vote) => `${vote.label} ${vote.count}`).join(', ');
 }
 
 function categoryFromFeatures(features) {

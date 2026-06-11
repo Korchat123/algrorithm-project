@@ -52,11 +52,11 @@ export function AlgorithmPage() {
 
   const currentStep = steps[stepIndex];
   const neighborKMax = isKnn
-    ? Math.max(1, Math.min(10, algorithm.trainingExamples?.length || input.split(',').filter(Boolean).length || 1))
+    ? Math.max(1, Math.min(10, input.split(',').filter(Boolean).length || 1))
     : 10;
   const knnPreviewStep = useMemo(() => (
-    isKnn ? buildKnnPreview(algorithm.trainingExamples || input, target) : null
-  ), [algorithm.trainingExamples, input, isKnn, target]);
+    isKnn ? buildKnnPreview(input, target) : null
+  ), [input, isKnn, target]);
   const nnPreviewStep = useMemo(() => (
     isNearestNeighbor ? buildVectorPreview(input, target, algorithm.slug) : null
   ), [algorithm.slug, input, isNearestNeighbor, target]);
@@ -102,7 +102,7 @@ export function AlgorithmPage() {
     }
     const nextSteps = buildSteps(
       algorithm,
-      isKnn ? (algorithm.trainingExamples || input) : isTextMachineLearning ? input : values,
+      isTextMachineLearning ? input : values,
       isTextMachineLearning ? target : Number(target),
       { k }
     );
@@ -174,6 +174,21 @@ export function AlgorithmPage() {
               <label>
                 Mock data
                 <input value={input} onChange={(event) => setInput(event.target.value)} />
+              </label>
+            )}
+            {isKnn && (
+              <label className="wide-control">
+                Known examples
+                <textarea
+                  rows="2"
+                  value={input}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    setSteps([]);
+                    setStepIndex(0);
+                    setIsPlaying(false);
+                  }}
+                />
               </label>
             )}
             <label>

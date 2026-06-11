@@ -972,73 +972,15 @@ function KnnVisualizer({ step }) {
   const measured = new Set(step?.measured || []);
   const nearest = new Set(step?.nearest || []);
   const compareTo = new Set(step?.compareTo || []);
-  const dragRef = useRef(null);
-  const [view, setView] = useState({ yaw: -24, pitch: 18, zoom: 1 });
-  const scene = buildKnn3dScene(points, query, view);
-  const visibleCategories = scene.categories.filter((category) => (
-    category.items.length || category.id === query?.feature || category.id === query?.label
-  ));
-  const pointById = new Map(scene.points.map((point) => [point.id, point]));
-
-  function handlePointerDown(event) {
-    dragRef.current = { x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function handlePointerMove(event) {
-    if (!dragRef.current) return;
-    const dx = event.clientX - dragRef.current.x;
-    const dy = event.clientY - dragRef.current.y;
-    dragRef.current.x = event.clientX;
-    dragRef.current.y = event.clientY;
-
-    setView((current) => ({
-      ...current,
-      yaw: current.yaw + dx * 0.45,
-      pitch: Math.max(-58, Math.min(58, current.pitch - dy * 0.35))
-    }));
-  }
-
-  function handlePointerUp(event) {
-    dragRef.current = null;
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  }
-
-  function handleWheel(event) {
-    event.preventDefault();
-    setView((current) => ({
-      ...current,
-      zoom: Math.max(0.72, Math.min(1.85, current.zoom - event.deltaY * 0.0012))
-    }));
-  }
 
   return (
     <div className="knn-stage">
-      <div className="vector-space-toolbar knn-toolbar">
-        <span>3D KNN space</span>
-        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.min(1.85, current.zoom + 0.14) }))}>Zoom in</button>
-        <button type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.max(0.72, current.zoom - 0.14) }))}>Zoom out</button>
-        <button type="button" onClick={() => setView({ yaw: -24, pitch: 18, zoom: 1 })}>Reset</button>
-      </div>
-      <div
-        className="knn-map knn-3d-map"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onWheel={handleWheel}
-      >
-        <div className="vector-space-help">Drag to rotate. Wheel to zoom.</div>
+      <div className="knn-teach-grid">
+      <div className="knn-map knn-feature-map">
+        <span className="axis-label x-axis">size grows right</span>
+        <span className="axis-label y-axis">nature grows up</span>
         <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          {visibleCategories.flatMap((category) => category.rings.map((ring) => (
-            <polyline
-              className="knn-sphere-ring"
-              key={`${category.id}-${ring.id}`}
-              points={ring.points.map((point) => `${point.x},${point.y}`).join(' ')}
-              style={{ '--sphere-color': category.color }}
-            />
-          )))}
-          {query && scene.points.map((point) => {
+          {query && points.map((point) => {
             const isMeasured = measured.has(point.id);
             const isNearest = nearest.has(point.id);
             const isActive = step?.activePoint === point.id;
@@ -1048,152 +990,126 @@ function KnnVisualizer({ step }) {
               <line
                 className={`knn-line ${isCompared ? 'compared' : ''} ${isNearest ? 'nearest' : ''} ${isActive ? 'active' : ''}`}
                 key={point.id}
-                x1={scene.query.x}
+                x1={query.x}
                 x2={point.x}
-                y1={scene.query.y}
+                y1={query.y}
                 y2={point.y}
               />
             );
           })}
         </svg>
-        {visibleCategories.map((category) => (
-          <div
-            className="knn-category-label"
-            key={category.id}
-            style={{
-              left: `${category.screen.x}%`,
-              top: `${category.screen.y}%`,
-              '--sphere-color': category.color
-            }}
-          >
-            <strong>{category.label}</strong>
-            <span>{category.items.length} samples</span>
-          </div>
-        ))}
-        {scene.points.slice().sort((a, b) => a.depth - b.depth).map((point) => (
+        {points.map((point) => (
           <span
             className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
             key={point.id}
             style={{
               left: `${point.x}%`,
               top: `${point.y}%`,
-              '--point-depth': point.depth,
-              '--point-color': point.color
+              '--point-color': getKnnPointColor(point)
             }}
           >
             <strong>{point.raw}</strong>
             <small>{point.label}</small>
+            <em>H {point.features.humanLike}</em>
           </span>
         ))}
-        {scene.query && (
+        {query && (
           <span
             className="knn-point query"
             style={{
-              left: `${scene.query.x}%`,
-              top: `${scene.query.y}%`,
-              '--point-depth': scene.query.depth,
-              '--point-color': scene.query.color
+              left: `${query.x}%`,
+              top: `${query.y}%`,
+              '--point-color': getKnnPointColor(query)
             }}
           >
-            <strong>{scene.query.raw}</strong>
+            <strong>{query.raw}</strong>
             <small>target</small>
+            <em>H {query.features.humanLike}</em>
           </span>
         )}
-        {step?.prediction && pointById.size > 0 && (
+        {step?.prediction && (
           <div className="knn-vote-board">
             <strong>Vote result</strong>
-            <span>{scene.query?.raw || 'target'} is {step.prediction}</span>
+            <span>{query?.raw || 'target'} is {step.prediction}</span>
           </div>
         )}
       </div>
+      <KnnDistancePanel step={step} measured={measured} nearest={nearest} />
+      </div>
       <div className="knn-explanation">
         <strong>{step?.phase || 'KNN category space'}</strong>
-        <p>{step?.detail || 'Each sphere is one category. Press Play to connect the target to nearby samples and watch the closest labels vote.'}</p>
+        <p>{step?.detail || 'Press Play to convert the target and known examples into features, measure distances, keep the K closest examples, then vote.'}</p>
         {step?.prediction && <span>Predicted category: {step.prediction}</span>}
       </div>
     </div>
   );
 }
 
-const knnCategoryStyles = {
-  living: { label: 'Living', x: -42, y: -16, z: 20, color: '#1f6f58' },
-  'man-made': { label: 'Man-made', x: 46, y: 20, z: -18, color: '#b24b34' },
-  unknown: { label: 'Unknown', x: 0, y: 2, z: -46, color: '#7d8b84' }
-};
+function KnnDistancePanel({ step, measured, nearest }) {
+  const query = step?.query;
+  const rows = step?.distanceRows || [];
+  const activeDistance = step?.activeDistance;
+  const voteCounts = step?.voteCounts || [];
 
-function buildKnn3dScene(points, query, view) {
-  const categories = Object.entries(knnCategoryStyles).map(([id, category]) => ({
-    id,
-    ...category,
-    screen: projectKnn3dPoint(category, view),
-    rings: buildKnnSphereRings({ id, ...category }, view),
-    items: points.filter((point) => (point.feature || point.label) === id),
-    radius: id === 'text' ? 22 : 28
-  }));
-
-  return {
-    categories,
-    points: points.map((point, index) => projectKnnItem(point, index, view)),
-    query: query ? projectKnnItem({ ...query, label: 'target', feature: query.feature || query.label }, 0, view, true) : null
-  };
+  return (
+    <aside className="knn-distance-panel">
+      <section>
+        <strong>Target features</strong>
+        {query ? (
+          <div className="knn-feature-chips">
+            <FeatureValue label="Size" value={query.features.size} />
+            <FeatureValue label="Nature" value={query.features.nature} />
+            <FeatureValue label="Human" value={query.features.humanLike} />
+          </div>
+        ) : <p>Run KNN to create a target point.</p>}
+      </section>
+      <section>
+        <strong>Distance ranking</strong>
+        <div className="knn-distance-list">
+          {rows.map((row) => (
+            <div
+              className={`knn-distance-row ${measured.has(row.id) ? 'measured' : ''} ${nearest.has(row.id) ? 'nearest' : ''} ${activeDistance?.id === row.id ? 'active' : ''}`}
+              key={row.id}
+            >
+              <span>#{row.rank}</span>
+              <b>{row.raw}</b>
+              <em>{row.label}</em>
+              <code>{measured.has(row.id) || nearest.has(row.id) ? row.distance.toFixed(2) : '-'}</code>
+            </div>
+          ))}
+        </div>
+      </section>
+      {activeDistance && (
+        <section>
+          <strong>Current formula</strong>
+          <p>sqrt({activeDistance.parts.map((part) => `${part.diff}^2`).join(' + ')}) = {activeDistance.distance.toFixed(2)}</p>
+        </section>
+      )}
+      {voteCounts.length > 0 && (
+        <section>
+          <strong>Votes from K neighbors</strong>
+          <div className="knn-vote-list">
+            {voteCounts.map((vote) => (
+              <span key={vote.label}>{vote.label}: {vote.count}</span>
+            ))}
+          </div>
+        </section>
+      )}
+    </aside>
+  );
 }
 
-function projectKnnItem(point, index, view, isQuery = false) {
-  const categoryId = point.feature || point.label;
-  const category = { id: categoryId, ...(knnCategoryStyles[categoryId] || knnCategoryStyles.text) };
-  const radius = category.id === 'text' ? 16 : 20;
-  const ring = index % 12;
-  const angle = (ring / 12) * Math.PI * 2;
-  const heightBand = ((Math.floor(index / 12) % 3) - 1) * 7;
-  const localRadius = isQuery ? 0 : Math.max(8, radius - Math.abs(heightBand) * 0.8);
-  const projected = projectKnn3dPoint({
-    x: category.x + Math.cos(angle) * localRadius,
-    y: category.y + heightBand,
-    z: category.z + Math.sin(angle) * localRadius
-  }, view);
-
-  return {
-    ...point,
-    ...projected,
-    color: category.color
-  };
+function FeatureValue({ label, value }) {
+  return (
+    <span>
+      <small>{label}</small>
+      {value}
+    </span>
+  );
 }
 
-function buildKnnSphereRings(category, view) {
-  const radius = category.id === 'text' ? 22 : 28;
-  const samples = 56;
-  const ringDefs = [
-    { id: 'xy', point: (angle) => ({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: 0 }) },
-    { id: 'xz', point: (angle) => ({ x: Math.cos(angle) * radius, y: 0, z: Math.sin(angle) * radius }) },
-    { id: 'yz', point: (angle) => ({ x: 0, y: Math.cos(angle) * radius, z: Math.sin(angle) * radius }) }
-  ];
-
-  return ringDefs.map((ring) => ({
-    id: ring.id,
-    points: Array.from({ length: samples + 1 }, (_, index) => {
-      const angle = (index / samples) * Math.PI * 2;
-      const point = ring.point(angle);
-      return projectKnn3dPoint({
-        x: category.x + point.x,
-        y: category.y + point.y,
-        z: category.z + point.z
-      }, view);
-    })
-  }));
-}
-
-function projectKnn3dPoint(point, view) {
-  const yaw = toRadians(view.yaw);
-  const pitch = toRadians(view.pitch);
-  const yawX = (point.x * Math.cos(yaw)) - (point.z * Math.sin(yaw));
-  const yawZ = (point.x * Math.sin(yaw)) + (point.z * Math.cos(yaw));
-  const pitchY = (point.y * Math.cos(pitch)) - (yawZ * Math.sin(pitch));
-  const pitchZ = (point.y * Math.sin(pitch)) + (yawZ * Math.cos(pitch));
-  const zoom = view.zoom;
-
-  return {
-    x: Math.max(-15, Math.min(115, 50 + yawX * 0.42 * zoom)),
-    y: Math.max(-15, Math.min(115, 50 + pitchY * 0.42 * zoom)),
-    depth: Math.max(-90, Math.min(90, pitchZ))
-  };
+function getKnnPointColor(point) {
+  if (point.feature === 'living' || point.label === 'living thing') return '#1f6f58';
+  if (point.feature === 'man-made' || point.label === 'man-made object') return '#b24b34';
+  return '#7d8b84';
 }
