@@ -51,8 +51,8 @@ export function AlgorithmPage() {
 
   const currentStep = steps[stepIndex];
   const knnPreviewStep = useMemo(() => (
-    isKnn ? buildKnnPreview(input, target) : null
-  ), [input, isKnn, target]);
+    isKnn ? buildKnnPreview(algorithm.trainingExamples || input, target) : null
+  ), [algorithm.trainingExamples, input, isKnn, target]);
   const nnPreviewStep = useMemo(() => (
     isNearestNeighbor ? buildVectorPreview(input, target, algorithm.slug) : null
   ), [algorithm.slug, input, isNearestNeighbor, target]);
@@ -95,7 +95,7 @@ export function AlgorithmPage() {
       setIsPlaying(false);
       return;
     }
-    const nextSteps = buildSteps(algorithm, isTextMachineLearning ? input : values, isTextMachineLearning ? target : Number(target));
+    const nextSteps = buildSteps(algorithm, isKnn ? (algorithm.trainingExamples || input) : isTextMachineLearning ? input : values, isTextMachineLearning ? target : Number(target));
     setSteps(nextSteps);
     setStepIndex(0);
     setIsPlaying(nextSteps.length > 1);

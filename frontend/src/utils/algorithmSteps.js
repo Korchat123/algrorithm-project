@@ -1314,17 +1314,35 @@ function buildVectorPoint(raw, isQuery = false, index = 0) {
 
 function parseKnnItems(input) {
   const rawItems = Array.isArray(input)
-    ? input.map((item) => String(item))
-    : String(input || '').split(',').map((item) => item.trim()).filter(Boolean);
-  const numericValues = rawItems.map(Number).filter((value) => Number.isFinite(value));
+    ? input.map((item) => (
+      typeof item === 'object' && item !== null
+        ? {
+          raw: String(item.text || item.raw || item.label || ''),
+          label: item.label || item.category,
+          category: item.category || item.label
+        }
+        : { raw: String(item) }
+    )).filter((item) => item.raw)
+    : String(input || '').split(',').map((item) => ({ raw: item.trim() })).filter((item) => item.raw);
+  const numericValues = rawItems.map((item) => Number(item.raw)).filter((value) => Number.isFinite(value));
   const numericMedian = numericValues.length
     ? [...numericValues].sort((a, b) => a - b)[Math.floor(numericValues.length / 2)]
     : 0;
 
-  return rawItems.map((raw, index, all) => buildKnnPoint(raw, getKnnLabel(raw, numericMedian), all, false, index));
+  return rawItems.map((item, index, all) => {
+    const allRawItems = all.map((entry) => entry.raw);
+    return buildKnnPoint(
+      item.raw,
+      item.label || getKnnLabel(item.raw, numericMedian),
+      allRawItems,
+      false,
+      index,
+      item.category
+    );
+  });
 }
 
-function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0) {
+function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0, knownCategory) {
   const number = Number(raw);
   const allNumbers = allItems.map(Number).filter((value) => Number.isFinite(value));
 
@@ -1344,7 +1362,7 @@ function buildKnnPoint(raw, label, allItems, isQuery = false, index = 0) {
   }
 
   const word = raw.toLowerCase();
-  const category = getTextCategory(word);
+  const category = knownCategory || getTextCategory(word);
   const anchor = categoryAnchors[category] || categoryAnchors.text;
   const xOffset = ((hashText(word) % 17) - 8) * 0.9;
   const yOffset = ((hashText([...word].reverse().join('')) % 17) - 8) * 0.9;
@@ -1367,17 +1385,20 @@ function getKnnLabel(raw, numericMedian) {
 
 const categoryAnchors = {
   fruit: { x: 20, y: 24 },
+  food: { x: 20, y: 24 },
   animal: { x: 78, y: 24 },
   vehicle: { x: 22, y: 76 },
   place: { x: 78, y: 76 },
+  person: { x: 50, y: 24 },
   text: { x: 50, y: 50 }
 };
 
 const textCategories = {
-  fruit: ['apple', 'banana', 'mango', 'kiwi', 'grape', 'peach', 'pear', 'orange', 'melon', 'berry'],
-  animal: ['tiger', 'dolphin', 'lion', 'cat', 'dog', 'bird', 'horse', 'zebra', 'shark'],
+  food: ['apple', 'banana', 'mango', 'kiwi', 'grape', 'peach', 'pear', 'orange', 'melon', 'berry', 'pizza', 'noodles', 'rice', 'bread', 'cheese', 'salad', 'pasta'],
+  animal: ['tiger', 'dolphin', 'lion', 'cat', 'dog', 'bird', 'horse', 'zebra', 'shark', 'eagle', 'kitten'],
   vehicle: ['bicycle', 'airplane', 'car', 'bus', 'train', 'truck', 'boat', 'ship', 'motorcycle', 'helicopter'],
-  place: ['school', 'museum', 'park', 'library', 'market', 'airport', 'station', 'city', 'beach', 'zoo']
+  place: ['school', 'museum', 'park', 'library', 'market', 'airport', 'station', 'city', 'beach', 'zoo'],
+  person: ['teacher', 'student', 'doctor', 'artist', 'friend', 'chef', 'driver', 'child', 'person', 'people']
 };
 
 function getTextCategory(word) {
