@@ -1528,7 +1528,14 @@ textarea {
 }
 
 .knn-feature-map {
+  cursor: grab;
   min-height: 430px;
+  touch-action: none;
+  user-select: none;
+}
+
+.knn-feature-map:active {
+  cursor: grabbing;
 }
 
 .knn-3d-map {

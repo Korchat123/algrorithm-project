@@ -972,15 +972,84 @@ function KnnVisualizer({ step }) {
   const measured = new Set(step?.measured || []);
   const nearest = new Set(step?.nearest || []);
   const compareTo = new Set(step?.compareTo || []);
+  const dragRef = useRef(null);
+  const [view, setView] = useState({ zoom: 1, panX: 0, panY: 0 });
+  const projectedPoints = points.map((point) => ({
+    ...point,
+    ...projectKnnFeaturePoint(point, view)
+  }));
+  const projectedQuery = query ? {
+    ...query,
+    ...projectKnnFeaturePoint(query, view)
+  } : null;
+
+  function updateZoom(amount) {
+    setView((current) => ({
+      ...current,
+      zoom: Math.max(0.65, Math.min(2.4, current.zoom + amount))
+    }));
+  }
+
+  function resetView() {
+    setView({ zoom: 1, panX: 0, panY: 0 });
+  }
+
+  function handlePointerDown(event) {
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event) {
+    if (!dragRef.current) return;
+    const dx = event.clientX - dragRef.current.x;
+    const dy = event.clientY - dragRef.current.y;
+    dragRef.current.x = event.clientX;
+    dragRef.current.y = event.clientY;
+
+    setView((current) => ({
+      ...current,
+      panX: Math.max(-80, Math.min(80, current.panX + dx * 0.16)),
+      panY: Math.max(-80, Math.min(80, current.panY + dy * 0.16))
+    }));
+  }
+
+  function handlePointerUp(event) {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  function handleWheel(event) {
+    event.preventDefault();
+    updateZoom(-event.deltaY * 0.0012);
+  }
 
   return (
     <div className="knn-stage">
+      <div className="vector-space-toolbar">
+        <span>2D feature map</span>
+        <button type="button" onClick={() => updateZoom(0.15)}>Zoom in</button>
+        <button type="button" onClick={() => updateZoom(-0.15)}>Zoom out</button>
+        <button type="button" onClick={resetView}>Reset</button>
+      </div>
       <div className="knn-teach-grid">
-      <div className="knn-map knn-feature-map">
+      <div
+        className="knn-map knn-feature-map"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+      >
         <span className="axis-label x-axis">size grows right</span>
         <span className="axis-label y-axis">nature grows up</span>
+        <div className="vector-space-help">
+          Drag to pan. Wheel to zoom.
+        </div>
         <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          {query && points.map((point) => {
+          {projectedQuery && projectedPoints.map((point) => {
             const isMeasured = measured.has(point.id);
             const isNearest = nearest.has(point.id);
             const isActive = step?.activePoint === point.id;
@@ -990,15 +1059,15 @@ function KnnVisualizer({ step }) {
               <line
                 className={`knn-line ${isCompared ? 'compared' : ''} ${isNearest ? 'nearest' : ''} ${isActive ? 'active' : ''}`}
                 key={point.id}
-                x1={query.x}
+                x1={projectedQuery.x}
                 x2={point.x}
-                y1={query.y}
+                y1={projectedQuery.y}
                 y2={point.y}
               />
             );
           })}
         </svg>
-        {points.map((point) => (
+        {projectedPoints.map((point) => (
           <span
             className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
             key={point.id}
@@ -1013,18 +1082,18 @@ function KnnVisualizer({ step }) {
             <em>H {point.features.humanLike}</em>
           </span>
         ))}
-        {query && (
+        {projectedQuery && (
           <span
             className="knn-point query"
             style={{
-              left: `${query.x}%`,
-              top: `${query.y}%`,
-              '--point-color': getKnnPointColor(query)
+              left: `${projectedQuery.x}%`,
+              top: `${projectedQuery.y}%`,
+              '--point-color': getKnnPointColor(projectedQuery)
             }}
           >
-            <strong>{query.raw}</strong>
+            <strong>{projectedQuery.raw}</strong>
             <small>target</small>
-            <em>H {query.features.humanLike}</em>
+            <em>H {projectedQuery.features.humanLike}</em>
           </span>
         )}
         {step?.prediction && (
@@ -1043,6 +1112,13 @@ function KnnVisualizer({ step }) {
       </div>
     </div>
   );
+}
+
+function projectKnnFeaturePoint(point, view) {
+  return {
+    x: Math.max(-20, Math.min(120, 50 + view.panX + ((point.x - 50) * view.zoom))),
+    y: Math.max(-20, Math.min(120, 50 + view.panY + ((point.y - 50) * view.zoom)))
+  };
 }
 
 function KnnDistancePanel({ step, measured, nearest }) {
