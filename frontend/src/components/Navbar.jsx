@@ -100,7 +100,7 @@ export function Navbar() {
         ) : (
           <>
             <Link to="/auth" className="nav-link">Log in</Link>
-            <Link to="/auth?mode=register" className="nav-register-button">Register</Link>
+            <Link to="/register" className="nav-register-button">Register</Link>
           </>
         )}
       </div>

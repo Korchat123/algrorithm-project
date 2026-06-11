@@ -22,6 +22,7 @@ export function AlgorithmPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [language, setLanguage] = useState('js');
+  const [k, setK] = useState(3);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +51,9 @@ export function AlgorithmPage() {
   }, [algorithm.slug, language, languageOptions, samples]);
 
   const currentStep = steps[stepIndex];
+  const neighborKMax = isKnn
+    ? Math.max(1, Math.min(10, algorithm.trainingExamples?.length || input.split(',').filter(Boolean).length || 1))
+    : 10;
   const knnPreviewStep = useMemo(() => (
     isKnn ? buildKnnPreview(algorithm.trainingExamples || input, target) : null
   ), [algorithm.trainingExamples, input, isKnn, target]);
@@ -84,6 +88,7 @@ export function AlgorithmPage() {
     setSteps([]);
     setStepIndex(0);
     setIsPlaying(false);
+    setK(3);
   }, [algorithm, fallbackDemo]);
 
   if (slug === 'vector-search') {
@@ -95,7 +100,12 @@ export function AlgorithmPage() {
       setIsPlaying(false);
       return;
     }
-    const nextSteps = buildSteps(algorithm, isKnn ? (algorithm.trainingExamples || input) : isTextMachineLearning ? input : values, isTextMachineLearning ? target : Number(target));
+    const nextSteps = buildSteps(
+      algorithm,
+      isKnn ? (algorithm.trainingExamples || input) : isTextMachineLearning ? input : values,
+      isTextMachineLearning ? target : Number(target),
+      { k }
+    );
     setSteps(nextSteps);
     setStepIndex(0);
     setIsPlaying(nextSteps.length > 1);
@@ -167,14 +177,26 @@ export function AlgorithmPage() {
               </label>
             )}
             <label>
-              Target
+              {isKnn ? 'Thing to classify' : 'Target'}
               <input
-                placeholder={isTextMachineLearning ? 'Type a word, for example airport' : undefined}
+                placeholder={isKnn ? 'Type a thing, for example dog' : isTextMachineLearning ? 'Type a word, for example airport' : undefined}
                 type={isTextMachineLearning ? 'text' : 'number'}
                 value={target}
                 onChange={(event) => setTarget(event.target.value)}
               />
             </label>
+            {isTextMachineLearning && (
+              <label>
+                K neighbors
+                <input
+                  max={neighborKMax}
+                  min="1"
+                  type="number"
+                  value={k}
+                  onChange={(event) => setK(Math.max(1, Math.min(neighborKMax, Number(event.target.value) || 1)))}
+                />
+              </label>
+            )}
             {!isTextMachineLearning && <button onClick={shuffleData}><Shuffle size={16} />Shuffle</button>}
           </div>
           <Visualizer algorithm={algorithm} values={isTextMachineLearning ? input : values} step={visualStep} target={target} />
@@ -258,7 +280,10 @@ function getAlgorithmDemo(algorithm, fallbackDemo) {
 
 function getFallbackDemo(algorithm) {
   if (algorithm.slug === 'knn') {
-    return { input: '1, 2, 7, 8', target: '6' };
+    return {
+      input: 'apple, banana, mango, orange, pizza, noodles, tiger, dolphin, eagle, kitten, lion, dog, bicycle, airplane, scooter, train, car, bus, school, museum, library, airport, zoo, market, teacher, student, doctor, artist',
+      target: 'dog'
+    };
   }
 
   if (isNearestNeighborAlgorithm(algorithm.slug)) {

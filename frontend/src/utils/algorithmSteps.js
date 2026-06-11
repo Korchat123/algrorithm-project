@@ -19,7 +19,7 @@ export function shuffle(values) {
   return [...values].sort(() => Math.random() - 0.5);
 }
 
-export function buildSteps(algorithm, values, target) {
+export function buildSteps(algorithm, values, target, options = {}) {
   if (algorithm.category === 'graph') {
     const order = algorithm.slug === 'bfs' ? bfsOrder() : dfsOrder();
     return withRoundCounts(order.map(({ node, from }, index) => {
@@ -34,9 +34,9 @@ export function buildSteps(algorithm, values, target) {
   }
 
   if (algorithm.category === 'machine-learning') {
-    if (algorithm.slug === 'knn') return withRoundCounts(knnSteps(values, target));
-    if (isNearestNeighborSearch(algorithm.slug)) return withRoundCounts(nearestNeighborSteps(algorithm.slug, values, target));
-    if (algorithm.slug === 'vector-search') return withRoundCounts(vectorSearchSteps(values, target, algorithm.vectorSearchMode));
+    if (algorithm.slug === 'knn') return withRoundCounts(knnSteps(values, target, options));
+    if (isNearestNeighborSearch(algorithm.slug)) return withRoundCounts(nearestNeighborSteps(algorithm.slug, values, target, options));
+    if (algorithm.slug === 'vector-search') return withRoundCounts(vectorSearchSteps(values, target, algorithm.vectorSearchMode, options));
 
     return withRoundCounts([
       { message: 'Convert every item into a vector.' },
@@ -75,7 +75,7 @@ export function buildKnnPreview(input, target) {
     query,
     compareTo: items.map((item) => item.id),
     phase: 'Target comparison',
-    detail: 'Enter a text target, then press Play to compare its distance to every training item.'
+    detail: 'Enter a thing like dog, car, apple, or school. KNN compares it with labeled sample items and predicts its category.'
   };
 }
 
@@ -1059,7 +1059,13 @@ function range(start, end) {
   return Array.from({ length: Math.max(0, end - start) }, (_, offset) => start + offset);
 }
 
-function knnSteps(input, target) {
+function getNeighborCount(value, itemCount, fallback = 3) {
+  const parsed = Number(value);
+  const requested = Number.isInteger(parsed) ? parsed : fallback;
+  return Math.max(1, Math.min(requested, Math.max(itemCount, 1)));
+}
+
+function knnSteps(input, target, options = {}) {
   const items = parseKnnItems(input);
   const rawItems = items.map((item) => item.raw);
   const query = buildKnnPoint(String(target || items[0]?.raw || 'target'), 'Target', rawItems, true);
@@ -1069,9 +1075,10 @@ function knnSteps(input, target) {
       distance: Math.hypot(item.x - query.x, item.y - query.y)
     }))
     .sort((a, b) => a.distance - b.distance);
-  const nearest = distances.slice(0, Math.min(3, distances.length));
+  const k = getNeighborCount(options.k, distances.length);
+  const nearest = distances.slice(0, k);
   const prediction = chooseKnnLabel(nearest);
-  const base = { points: items, query, nearest: [] };
+  const base = { points: items, query, nearest: [], k };
 
   if (!items.length) {
     return [{ message: 'Add numbers or words first so KNN can map them.' }];
@@ -1082,8 +1089,8 @@ function knnSteps(input, target) {
       ...base,
       phase: 'Map data',
       codeLines: [2, 3],
-      message: 'Map each number or word into a point.',
-      detail: 'KNN first turns each input into features. Numbers use their value. Words use length and first letter so they can be placed on the map.'
+      message: 'Map labeled sample things into points.',
+      detail: 'KNN starts with known examples from the sample database. Each thing already has a label such as animal, food, vehicle, place, or person.'
     },
     ...distances.map((item, index) => ({
       ...base,
@@ -1091,8 +1098,8 @@ function knnSteps(input, target) {
       measured: distances.slice(0, index + 1).map((entry) => entry.id),
       phase: `Distance ${index + 1}`,
       codeLines: [5, 7],
-      message: `Measure distance from target to ${item.raw}.`,
-      detail: `${item.raw} is ${item.distance.toFixed(1)} map units from the target. Smaller distance means more similar.`
+      message: `Measure distance from ${query.raw} to ${item.raw}.`,
+      detail: `${item.raw} is labeled "${item.label}" and is ${item.distance.toFixed(1)} map units from ${query.raw}. Smaller distance means more similar.`
     })),
     {
       ...base,
@@ -1100,8 +1107,8 @@ function knnSteps(input, target) {
       nearest: nearest.map((item) => item.id),
       phase: 'Pick nearest',
       codeLines: [10],
-      message: 'Choose the 3 closest points.',
-      detail: `The nearest neighbors are ${nearest.map((item) => item.raw).join(', ')}. KNN only votes with these closest examples.`
+      message: `Choose the ${k} closest point${k === 1 ? '' : 's'}.`,
+      detail: `The nearest examples are ${nearest.map((item) => `${item.raw} (${item.label})`).join(', ')}. KNN only votes with these closest labeled examples.`
     },
     {
       ...base,
@@ -1110,13 +1117,13 @@ function knnSteps(input, target) {
       prediction,
       phase: 'Vote',
       codeLines: [11],
-      message: `Predicted class: ${prediction}.`,
-      detail: `The closest examples vote by label, so the target is predicted as "${prediction}".`
+      message: `Predicted category: ${prediction}.`,
+      detail: `The closest examples vote by category, so "${query.raw}" is predicted as "${prediction}".`
     }
   ];
 }
 
-function vectorSearchSteps(input, target, mode = 'top-k') {
+function vectorSearchSteps(input, target, mode = 'top-k', options = {}) {
   const items = parseVectorItems(input);
   const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
   const queryTokens = tokenizeText(query.raw);
@@ -1132,10 +1139,11 @@ function vectorSearchSteps(input, target, mode = 'top-k') {
   const comparedIds = new Set(comparedItems.map((item) => item.id));
   const comparedRanked = ranked.filter((item) => comparedIds.has(item.id));
   const positiveMatches = comparedRanked.filter((item) => item.similarity > 0);
+  const k = getNeighborCount(options.k, positiveMatches.length);
   const topMatches = modeConfig.id === 'radius'
     ? comparedRanked.filter((item) => item.similarity >= modeConfig.radius)
-    : positiveMatches.slice(0, Math.min(3, positiveMatches.length));
-  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, radius: modeConfig.radius };
+    : positiveMatches.slice(0, k);
+  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, radius: modeConfig.radius, k };
 
   if (!items.length) {
     return [{ message: 'Add text items first so vector search can map them.' }];
@@ -1175,7 +1183,7 @@ function vectorSearchSteps(input, target, mode = 'top-k') {
   ];
 }
 
-function nearestNeighborSteps(mode, input, target) {
+function nearestNeighborSteps(mode, input, target, options = {}) {
   const items = parseVectorItems(input);
   const query = buildVectorPoint(String(target || items[0]?.raw || 'query'), true);
   const modeConfig = nearestNeighborModeConfig(mode);
@@ -1187,8 +1195,9 @@ function nearestNeighborSteps(mode, input, target) {
       matchReason: explainVectorMatch(item, query)
     }))
     .sort((a, b) => b.similarity - a.similarity);
-  const nearest = ranked.slice(0, Math.min(3, ranked.length));
-  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, modeLabel: modeConfig.modeLabel };
+  const k = getNeighborCount(options.k, ranked.length);
+  const nearest = ranked.slice(0, k);
+  const base = { points: items, query, nearest: [], searchMode: modeConfig.id, modeLabel: modeConfig.modeLabel, k };
 
   if (!items.length) {
     return [{ message: 'Add text items first so nearest-neighbor search can map them.' }];
@@ -1262,10 +1271,10 @@ function vectorSearchModeConfig(mode) {
     radius: null,
     previewPhase: 'Top-k search',
     previewDetail: 'Top-k search ranks every vector and returns a fixed number of closest matches.',
-    embedDetail: 'Top-k mode will compare every stored vector and keep the three highest scores.',
+    embedDetail: 'Top-k mode will compare every stored vector and keep the requested number of highest scores.',
     compareLabel: 'Similarity',
-    resultPhase: 'Rank top 3',
-    resultMessage: 'Return the three most similar items.',
+    resultPhase: 'Rank top K',
+    resultMessage: 'Return the most similar items.',
     resultDetail: (matches) => `The closest meaning/word matches are ${matches.map((item) => `${item.raw} (${item.label})`).join(', ')}.`,
     emptyDetail: 'No sample word has a positive similarity score for this query.'
   };

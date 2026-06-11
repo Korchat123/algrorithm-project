@@ -3165,8 +3165,27 @@ pre {
   width: 100%;
 }
 
+.auth-detail,
+.auth-switch {
+  color: #52615b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.auth-switch a {
+  color: #1f6f58;
+  font-weight: 800;
+}
+
 .error {
   color: #b24b34;
+  margin: 0;
+}
+
+.success-message {
+  color: #176b52;
+  font-weight: 800;
+  line-height: 1.45;
   margin: 0;
 }
 
