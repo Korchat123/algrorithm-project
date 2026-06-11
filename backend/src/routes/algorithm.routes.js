@@ -33,6 +33,12 @@ router.get('/:slug', async (req, res, next) => {
       const payload = typeof algorithm.toObject === 'function' ? algorithm.toObject() : algorithm;
       return res.json({
         ...payload,
+        demo: {
+          ...(payload.demo || {}),
+          input: payload.demo?.input || fallback?.demo?.input,
+          target: 'dog',
+          note: 'Labeled sample things let KNN classify a target such as dog as animal.'
+        },
         trainingExamples: trainingExamples.length ? trainingExamples : knnExamples
       });
     }

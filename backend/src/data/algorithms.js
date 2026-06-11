@@ -372,8 +372,8 @@ export const algorithms = [
     bigO: { best: 'O(n)', average: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)' },
     demo: {
       input: 'apple, banana, mango, orange, tiger, dolphin, eagle, kitten, bicycle, airplane, scooter, train, school, museum, library, airport, teacher, student, pizza, noodles',
-      target: 'zoo',
-      note: 'Mixed labeled words give the KNN visualizer enough nearby examples for animals, food, vehicles, places, and people.'
+      target: 'dog',
+      note: 'Mixed labeled words from the KNN sample database let the visualizer classify a thing such as dog as animal.'
     },
     codeExamples: [
       {
