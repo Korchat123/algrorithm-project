@@ -1517,6 +1517,70 @@ textarea {
   position: relative;
 }
 
+.knn-3d-map {
+  background:
+    radial-gradient(circle at 52% 45%, rgba(255, 255, 255, 0.96), rgba(238, 243, 237, 0.8) 42%, rgba(216, 222, 210, 0.72)),
+    linear-gradient(#d8ded2 1px, transparent 1px),
+    linear-gradient(90deg, #d8ded2 1px, transparent 1px),
+    #f9faf8;
+  background-size: auto, 38px 38px, 38px 38px;
+  min-height: 430px;
+  perspective: 900px;
+}
+
+.knn-3d-map::before {
+  background: radial-gradient(ellipse, rgba(23, 32, 38, 0.13), transparent 66%);
+  bottom: 26px;
+  content: "";
+  height: 72px;
+  left: 9%;
+  position: absolute;
+  right: 9%;
+  transform: rotateX(68deg);
+  z-index: 0;
+}
+
+.knn-category-sphere {
+  align-items: center;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.88), transparent 18%),
+    radial-gradient(circle at 64% 68%, color-mix(in srgb, var(--sphere-color) 78%, #172026), var(--sphere-color) 54%, color-mix(in srgb, var(--sphere-color) 50%, #ffffff));
+  border: 1px solid color-mix(in srgb, var(--sphere-color) 72%, #ffffff);
+  border-radius: 999px;
+  box-shadow:
+    inset -18px -22px 42px rgba(23, 32, 38, 0.22),
+    inset 14px 14px 28px rgba(255, 255, 255, 0.3),
+    0 22px 40px var(--sphere-shadow);
+  color: #ffffff;
+  display: grid;
+  height: var(--sphere-size);
+  justify-items: center;
+  left: var(--sphere-x);
+  opacity: 0.72;
+  padding: 34px 16px 18px;
+  place-content: center;
+  position: absolute;
+  text-align: center;
+  top: var(--sphere-y);
+  transform: translate(-50%, -50%) rotateX(10deg) rotateY(-18deg);
+  width: var(--sphere-size);
+  z-index: 1;
+}
+
+.knn-category-sphere strong {
+  font-size: 16px;
+  line-height: 1;
+  text-shadow: 0 1px 10px rgba(23, 32, 38, 0.3);
+}
+
+.knn-category-sphere span {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 10px;
+  font-weight: 900;
+  margin-top: 5px;
+  text-transform: uppercase;
+}
+
 .vector-search-stage .knn-map {
   min-height: 420px;
 }
@@ -1708,7 +1772,7 @@ textarea {
 .knn-point {
   align-items: center;
   background: #ffffff;
-  border: 2px solid #3e7f6e;
+  border: 2px solid var(--point-color, #3e7f6e);
   border-radius: 8px;
   color: #173f34;
   display: grid;
@@ -1718,9 +1782,9 @@ textarea {
   min-width: 66px;
   padding: 7px 9px;
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translateY(calc(var(--point-depth, 0) * -0.08px)) scale(calc(1 + (var(--point-depth, 0) * 0.003)));
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-  z-index: 2;
+  z-index: 4;
 }
 
 .knn-point strong {
@@ -1745,7 +1809,7 @@ textarea {
 .knn-point.active {
   border-color: #d95d39;
   box-shadow: 0 10px 24px rgba(217, 93, 57, 0.2);
-  transform: translate(-50%, -58%);
+  transform: translate(-50%, -64%) scale(1.05);
 }
 
 .knn-point.nearest {
@@ -1765,7 +1829,34 @@ textarea {
   color: #ffffff;
   min-height: 64px;
   min-width: 76px;
-  z-index: 4;
+  z-index: 8;
+}
+
+.knn-vote-board {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #d8ded2;
+  border-radius: 8px;
+  bottom: 12px;
+  box-shadow: 0 14px 28px rgba(23, 32, 38, 0.12);
+  color: #173f34;
+  display: grid;
+  gap: 4px;
+  left: 12px;
+  min-width: 170px;
+  padding: 10px 12px;
+  position: absolute;
+  z-index: 9;
+}
+
+.knn-vote-board strong {
+  color: #b24b34;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.knn-vote-board span {
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .vector-search-stage .knn-point {

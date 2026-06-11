@@ -972,14 +972,35 @@ function KnnVisualizer({ step }) {
   const measured = new Set(step?.measured || []);
   const nearest = new Set(step?.nearest || []);
   const compareTo = new Set(step?.compareTo || []);
+  const scene = buildKnn3dScene(points, query);
+  const visibleCategories = scene.categories.filter((category) => (
+    category.items.length || category.id === query?.feature || category.id === query?.label
+  ));
+  const pointById = new Map(scene.points.map((point) => [point.id, point]));
 
   return (
     <div className="knn-stage">
-      <div className="knn-map">
-        <span className="axis-label x-axis">feature 1</span>
-        <span className="axis-label y-axis">feature 2</span>
+      <div className="knn-map knn-3d-map">
+        <span className="axis-label x-axis">feature space</span>
+        <span className="axis-label y-axis">category spheres</span>
+        {visibleCategories.map((category) => (
+          <section
+            className={`knn-category-sphere ${category.id}`}
+            key={category.id}
+            style={{
+              '--sphere-x': `${category.screen.x}%`,
+              '--sphere-y': `${category.screen.y}%`,
+              '--sphere-size': `${category.size}px`,
+              '--sphere-color': category.color,
+              '--sphere-shadow': category.shadow
+            }}
+          >
+            <strong>{category.label}</strong>
+            <span>{category.items.length} samples</span>
+          </section>
+        ))}
         <svg className="knn-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          {query && points.map((point) => {
+          {query && scene.points.map((point) => {
             const isMeasured = measured.has(point.id);
             const isNearest = nearest.has(point.id);
             const isActive = step?.activePoint === point.id;
@@ -989,36 +1010,108 @@ function KnnVisualizer({ step }) {
               <line
                 className={`knn-line ${isCompared ? 'compared' : ''} ${isNearest ? 'nearest' : ''} ${isActive ? 'active' : ''}`}
                 key={point.id}
-                x1={query.x}
+                x1={scene.query.x}
                 x2={point.x}
-                y1={query.y}
+                y1={scene.query.y}
                 y2={point.y}
               />
             );
           })}
         </svg>
-        {points.map((point) => (
+        {scene.points.map((point) => (
           <span
             className={`knn-point ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
             key={point.id}
-            style={{ left: `${point.x}%`, top: `${point.y}%` }}
+            style={{
+              left: `${point.x}%`,
+              top: `${point.y}%`,
+              '--point-depth': point.depth,
+              '--point-color': point.color
+            }}
           >
             <strong>{point.raw}</strong>
             <small>{point.label}</small>
           </span>
         ))}
-        {query && (
-          <span className="knn-point query" style={{ left: `${query.x}%`, top: `${query.y}%` }}>
-            <strong>{query.raw}</strong>
+        {scene.query && (
+          <span
+            className="knn-point query"
+            style={{
+              left: `${scene.query.x}%`,
+              top: `${scene.query.y}%`,
+              '--point-depth': scene.query.depth,
+              '--point-color': scene.query.color
+            }}
+          >
+            <strong>{scene.query.raw}</strong>
             <small>target</small>
           </span>
         )}
+        {step?.prediction && pointById.size > 0 && (
+          <div className="knn-vote-board">
+            <strong>Vote result</strong>
+            <span>{scene.query?.raw || 'target'} is {step.prediction}</span>
+          </div>
+        )}
       </div>
       <div className="knn-explanation">
-        <strong>{step?.phase || 'KNN map'}</strong>
-        <p>{step?.detail || 'Press Play to map your data and compare each point to the target.'}</p>
-        {step?.prediction && <span>Result: {step.prediction}</span>}
+        <strong>{step?.phase || 'KNN category space'}</strong>
+        <p>{step?.detail || 'Each sphere is one category. Press Play to connect the target to nearby samples and watch the closest labels vote.'}</p>
+        {step?.prediction && <span>Predicted category: {step.prediction}</span>}
       </div>
     </div>
   );
+}
+
+const knnCategoryStyles = {
+  food: { label: 'Food', x: 20, y: 26, z: -16, color: '#d95d39', shadow: 'rgba(217, 93, 57, 0.22)' },
+  animal: { label: 'Animal', x: 76, y: 24, z: 16, color: '#1f6f58', shadow: 'rgba(31, 111, 88, 0.24)' },
+  vehicle: { label: 'Vehicle', x: 22, y: 76, z: 14, color: '#397b68', shadow: 'rgba(57, 123, 104, 0.24)' },
+  place: { label: 'Place', x: 78, y: 74, z: -10, color: '#b24b34', shadow: 'rgba(178, 75, 52, 0.21)' },
+  person: { label: 'Person', x: 50, y: 49, z: 24, color: '#52615b', shadow: 'rgba(82, 97, 91, 0.24)' },
+  text: { label: 'Unknown', x: 50, y: 50, z: -28, color: '#7d8b84', shadow: 'rgba(82, 97, 91, 0.18)' }
+};
+
+function buildKnn3dScene(points, query) {
+  const categories = Object.entries(knnCategoryStyles).map(([id, category]) => ({
+    id,
+    ...category,
+    screen: projectKnn3dPoint(category),
+    items: points.filter((point) => (point.feature || point.label) === id),
+    size: id === 'text' ? 118 : 138
+  }));
+
+  return {
+    categories,
+    points: points.map((point, index) => projectKnnItem(point, index)),
+    query: query ? projectKnnItem({ ...query, label: 'target', feature: query.feature || query.label }, 0, true) : null
+  };
+}
+
+function projectKnnItem(point, index, isQuery = false) {
+  const category = knnCategoryStyles[point.feature || point.label] || knnCategoryStyles.text;
+  const ring = index % 8;
+  const angle = (ring / 8) * Math.PI * 2;
+  const shell = Math.floor(index / 8);
+  const radius = isQuery ? 0 : 18 + ((shell % 2) * 5);
+  const zOffset = isQuery ? 34 : ((ring % 3) - 1) * 8 + (shell * 2);
+  const projected = projectKnn3dPoint({
+    x: category.x + Math.cos(angle) * radius,
+    y: category.y + Math.sin(angle) * radius * 0.58,
+    z: category.z + zOffset
+  });
+
+  return {
+    ...point,
+    ...projected,
+    color: category.color
+  };
+}
+
+function projectKnn3dPoint(point) {
+  return {
+    x: Math.max(5, Math.min(95, point.x - point.z * 0.18)),
+    y: Math.max(7, Math.min(93, point.y + point.z * 0.12)),
+    depth: Math.max(-40, Math.min(50, point.z))
+  };
 }
