@@ -8,7 +8,10 @@ export function Visualizer({ algorithm, values, step, target }) {
     if (algorithm.slug === 'knn') {
       return <KnnVisualizer step={step} />;
     }
-    return <VectorVisualizer step={step} />;
+    if (algorithm.slug === 'vector-search') {
+      return <VectorVisualizer step={step} />;
+    }
+    return <NearestNeighborVisualizer algorithm={algorithm} step={step} />;
   }
 
   if (algorithm.category === 'search') {
@@ -358,6 +361,305 @@ function GraphVisualizer({ algorithm, step }) {
 }
 
 const emptyVectorPoints = [];
+
+function NearestNeighborVisualizer({ algorithm, step }) {
+  if (algorithm.slug === 'hnsw') {
+    return <HnswVisualizer step={step} />;
+  }
+  if (algorithm.slug === 'kd-tree') {
+    return <KdTreeVisualizer step={step} />;
+  }
+  if (algorithm.slug === 'brute-force-search') {
+    return <BruteForceVectorVisualizer step={step} />;
+  }
+  return <AnnVisualizer step={step} />;
+}
+
+function AnnVisualizer({ step }) {
+  const points = step?.points || emptyVectorPoints;
+  const query = step?.query;
+  const candidateIds = new Set(step?.compareTo || []);
+  const measured = new Set(step?.measured || []);
+  const nearest = new Set(step?.nearest || []);
+  const clusters = buildPointClusters(points);
+
+  return (
+    <div className="ml-stage ann-stage">
+      <div className="ann-map">
+        <svg className="ann-cluster-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          {query && clusters.map((cluster) => (
+            <line
+              className={`ann-cluster-link ${cluster.items.some((item) => candidateIds.has(item.id)) ? 'candidate' : ''}`}
+              key={cluster.label}
+              x1={query.x}
+              x2={cluster.x}
+              y1={query.y}
+              y2={cluster.y}
+            />
+          ))}
+        </svg>
+        {clusters.map((cluster) => (
+          <section
+            className={`ann-cluster ${cluster.items.some((item) => candidateIds.has(item.id)) ? 'candidate' : ''}`}
+            key={cluster.label}
+            style={{ left: `${cluster.x}%`, top: `${cluster.y}%` }}
+          >
+            <strong>{cluster.label}</strong>
+            <span>{cluster.items.length} vectors</span>
+          </section>
+        ))}
+        {points.map((point) => (
+          <VectorDot
+            key={point.id}
+            point={point}
+            className={`${candidateIds.has(point.id) ? 'candidate' : ''} ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
+          />
+        ))}
+        {query && <VectorDot point={query} className="query" label="query" />}
+      </div>
+      <MlExplanation step={step} fallbackTitle="ANN candidate search" fallbackDetail="ANN first chooses likely clusters, then compares only those candidate vectors." />
+    </div>
+  );
+}
+
+function HnswVisualizer({ step }) {
+  const points = step?.points || emptyVectorPoints;
+  const query = step?.query;
+  const candidateIds = new Set(step?.compareTo || []);
+  const measured = new Set(step?.measured || []);
+  const nearest = new Set(step?.nearest || []);
+  const layers = buildHnswLayers(points);
+  const flatNodes = layers.flatMap((layer) => layer.nodes);
+
+  return (
+    <div className="ml-stage hnsw-stage">
+      <div className="hnsw-layers">
+        <svg className="hnsw-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          {layers.map((layer) => layer.nodes.slice(1).map((node, index) => {
+            const previous = layer.nodes[index];
+            const isCandidate = candidateIds.has(node.id) || candidateIds.has(previous.id);
+            return (
+              <line
+                className={`hnsw-link ${isCandidate ? 'candidate' : ''}`}
+                key={`${layer.name}-${previous.id}-${node.id}`}
+                x1={previous.x}
+                x2={node.x}
+                y1={previous.y}
+                y2={node.y}
+              />
+            );
+          }))}
+          {layers.slice(0, -1).flatMap((layer, layerIndex) => layer.nodes.map((node) => {
+            const next = layers[layerIndex + 1].nodes.find((item) => item.id === node.id);
+            if (!next) return null;
+            return (
+              <line
+                className={`hnsw-drop ${candidateIds.has(node.id) ? 'candidate' : ''}`}
+                key={`${layer.name}-${node.id}-drop`}
+                x1={node.x}
+                x2={next.x}
+                y1={node.y}
+                y2={next.y}
+              />
+            );
+          }))}
+        </svg>
+        {layers.map((layer) => (
+          <div className="hnsw-layer-label" key={layer.name} style={{ top: `${layer.y}%` }}>
+            {layer.name}
+          </div>
+        ))}
+        {flatNodes.map((node) => (
+          <VectorDot
+            key={`${node.layer}-${node.id}`}
+            point={node}
+            className={`hnsw-node ${candidateIds.has(node.id) ? 'candidate' : ''} ${measured.has(node.id) ? 'measured' : ''} ${nearest.has(node.id) ? 'nearest' : ''} ${step?.activePoint === node.id ? 'active' : ''}`}
+            label={node.layer}
+          />
+        ))}
+        {query && <VectorDot point={{ ...query, x: 9, y: 13 }} className="query hnsw-query" label="query" />}
+      </div>
+      <MlExplanation step={step} fallbackTitle="HNSW layered graph" fallbackDetail="HNSW starts on sparse upper links, drops layers, and refines the search near the query." />
+    </div>
+  );
+}
+
+function KdTreeVisualizer({ step }) {
+  const points = step?.points || emptyVectorPoints;
+  const query = step?.query;
+  const measured = new Set(step?.measured || []);
+  const nearest = new Set(step?.nearest || []);
+  const treeNodes = buildKdTreeNodes(points.slice(0, 7));
+  const activeNode = treeNodes.find((node) => node.id === step?.activePoint);
+
+  return (
+    <div className="ml-stage kd-stage">
+      <div className="kd-layout">
+        <div className="kd-space">
+          <span className="kd-split vertical" style={{ left: '50%' }} />
+          <span className="kd-split horizontal" style={{ top: '50%' }} />
+          <span className="kd-split vertical secondary" style={{ left: '25%' }} />
+          <span className="kd-split horizontal secondary" style={{ top: '28%' }} />
+          {points.map((point) => (
+            <VectorDot
+              key={point.id}
+              point={point}
+              className={`${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
+            />
+          ))}
+          {query && <VectorDot point={query} className="query" label="query" />}
+        </div>
+        <div className="kd-tree">
+          <svg className="kd-tree-lines" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+            {treeNodes.filter((node) => node.parent).map((node) => {
+              const parent = treeNodes.find((item) => item.id === node.parent);
+              return (
+                <line
+                  className={`kd-tree-link ${measured.has(node.id) || measured.has(parent?.id) ? 'visited' : ''}`}
+                  key={`${node.parent}-${node.id}`}
+                  x1={parent.x}
+                  x2={node.x}
+                  y1={parent.y}
+                  y2={node.y}
+                />
+              );
+            })}
+          </svg>
+          {treeNodes.map((node) => (
+            <span
+              className={`kd-tree-node ${measured.has(node.id) ? 'visited' : ''} ${nearest.has(node.id) ? 'nearest' : ''} ${step?.activePoint === node.id ? 'active' : ''}`}
+              key={node.id}
+              style={{ left: `${node.x}%`, top: `${node.y}%` }}
+            >
+              <strong>{node.raw}</strong>
+              <small>{node.axis}</small>
+            </span>
+          ))}
+        </div>
+      </div>
+      <MlExplanation
+        step={step}
+        fallbackTitle="K-d tree split search"
+        fallbackDetail="The tree splits space by alternating axes, then checks the branch most likely to contain the nearest point."
+        extra={activeNode ? `Current split: ${activeNode.axis}` : undefined}
+      />
+    </div>
+  );
+}
+
+function BruteForceVectorVisualizer({ step }) {
+  const points = step?.points || emptyVectorPoints;
+  const query = step?.query;
+  const measured = new Set(step?.measured || []);
+  const nearest = new Set(step?.nearest || []);
+  const activeIndex = points.findIndex((point) => point.id === step?.activePoint);
+
+  return (
+    <div className="ml-stage brute-stage">
+      <div className="brute-scan">
+        <div className="brute-query">
+          <strong>{query?.raw || 'query'}</strong>
+          <span>query vector</span>
+        </div>
+        <div className="brute-row" style={{ '--scan-count': Math.max(points.length, 1) }}>
+          {points.map((point, index) => (
+            <div
+              className={`brute-cell ${measured.has(point.id) ? 'measured' : ''} ${nearest.has(point.id) ? 'nearest' : ''} ${step?.activePoint === point.id ? 'active' : ''}`}
+              key={point.id}
+            >
+              <small>{index + 1}</small>
+              <strong>{point.raw}</strong>
+              <span>{point.label}</span>
+            </div>
+          ))}
+        </div>
+        {activeIndex >= 0 && (
+          <span className="brute-scanner" style={{ left: `${((activeIndex + 0.5) / Math.max(points.length, 1)) * 100}%` }}>
+            compare
+          </span>
+        )}
+      </div>
+      <MlExplanation step={step} fallbackTitle="Brute force scan" fallbackDetail="Brute force compares the query against every vector, then sorts the full score list." />
+    </div>
+  );
+}
+
+function VectorDot({ point, className = '', label }) {
+  return (
+    <span className={`ml-dot ${className}`} style={{ left: `${point.x}%`, top: `${point.y}%` }}>
+      <strong>{point.raw}</strong>
+      <small>{label || point.label}</small>
+    </span>
+  );
+}
+
+function MlExplanation({ step, fallbackTitle, fallbackDetail, extra }) {
+  return (
+    <div className="knn-explanation">
+      <strong>{step?.phase || fallbackTitle}</strong>
+      <p>{step?.detail || fallbackDetail}</p>
+      {step?.prediction && <span>Top matches: {step.prediction}</span>}
+      {extra && <span>{extra}</span>}
+    </div>
+  );
+}
+
+function buildPointClusters(points) {
+  const groups = points.reduce((acc, point) => {
+    acc[point.label] = [...(acc[point.label] || []), point];
+    return acc;
+  }, {});
+
+  return Object.entries(groups).map(([label, items]) => ({
+    label,
+    items,
+    x: items.reduce((sum, item) => sum + item.x, 0) / items.length,
+    y: items.reduce((sum, item) => sum + item.y, 0) / items.length
+  }));
+}
+
+function buildHnswLayers(points) {
+  const sorted = points.slice(0, 12);
+  const representatives = [...new Map(sorted.map((point) => [point.label, point])).values()].slice(0, 5);
+  const middle = sorted.filter((_, index) => index % 2 === 0).slice(0, 8);
+
+  return [
+    layoutHnswLayer('Layer 2', representatives.length ? representatives : sorted.slice(0, 3), 18),
+    layoutHnswLayer('Layer 1', middle.length ? middle : sorted.slice(0, 6), 48),
+    layoutHnswLayer('Layer 0', sorted, 78)
+  ];
+}
+
+function layoutHnswLayer(name, nodes, y) {
+  return {
+    name,
+    y,
+    nodes: nodes.map((node, index) => ({
+      ...node,
+      layer: name,
+      x: ((index + 1) / (nodes.length + 1)) * 86 + 7,
+      y
+    }))
+  };
+}
+
+function buildKdTreeNodes(points) {
+  const layout = [
+    { x: 50, y: 13, parent: null, axis: 'x split' },
+    { x: 27, y: 38, parent: 0, axis: 'y split' },
+    { x: 73, y: 38, parent: 0, axis: 'y split' },
+    { x: 16, y: 70, parent: 1, axis: 'x split' },
+    { x: 38, y: 70, parent: 1, axis: 'x split' },
+    { x: 62, y: 70, parent: 2, axis: 'x split' },
+    { x: 84, y: 70, parent: 2, axis: 'x split' }
+  ];
+
+  return points.map((point, index) => ({
+    ...point,
+    ...layout[index],
+    parent: Number.isInteger(layout[index].parent) ? points[layout[index].parent]?.id : null
+  }));
+}
 
 function VectorVisualizer({ step }) {
   const points = step?.points || emptyVectorPoints;
